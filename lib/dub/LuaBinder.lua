@@ -6,6 +6,8 @@
   Use the dub.Inspector to create Lua bindings.
 
 --]]------------------------------------------------------
+require 'platform'
+
 local lib     = {
   type = 'dub.LuaBinder',
   SELF = 'self',
@@ -22,9 +24,11 @@ local lib     = {
   -- relative to the bindings output directory.
   COPY_DUB_PATH  = '',
   COMPILER       = 'g++',
+	QUOTE = '',
   COMPILER_FLAGS = {
     macosx = '-g -Wall -Wl,-headerpad_max_install_names -flat_namespace -undefined suppress -dynamic -bundle -fPIC',
     linux  = '-g -Wall -Wl,-headerpad_max_install_names -flat_namespace -undefined suppress -dynamic -fPIC',
+    windows = '-g -Wall -Wl,-headerpad_max_install_names,--allow-shlib-undefined -shared  ',
   }
 }
 local private = {}
@@ -44,6 +48,7 @@ setmetatable(lib, {
 function lib:bind(inspector, options)
   self.options = options
   self.output_directory = self.output_directory or options.output_directory
+	platform.mkdir(self.output_directory)
   self.ins     = inspector
   if options.only then
     for _,name in ipairs(options.only) do
@@ -51,8 +56,14 @@ function lib:bind(inspector, options)
       if elem.type == 'dub.Class' then
         local path = self.output_directory .. lk.Dir.sep .. elem.name .. '.cpp'
         local file = io.open(path, 'w')
-        file:write(self:bindClass(elem))
-        file:close()
+				if file then
+					file:write(self:bindClass(elem))
+					file:close()
+				else
+					print("Failed to open "..path.." for writing")
+					os.exit(-1)
+				end
+
       end
     end
   end
@@ -64,8 +75,8 @@ function lib:build(output, base_path, file_pattern, extra_flags)
   local files = ''
   for f in dir:glob(file_pattern) do
     files = files .. ' ' .. f
-  end
-  local cmd = self.COMPILER .. ' ' 
+	end
+  local cmd = self.COMPILER .. ' '
   cmd = cmd .. self.COMPILER_FLAGS[private.platform()] .. ' '
   cmd = cmd .. (self.extra_flags or '') .. ' '
   cmd = cmd .. '-I' .. base_path .. ' '
@@ -73,7 +84,8 @@ function lib:build(output, base_path, file_pattern, extra_flags)
   if extra_flags then
     cmd = cmd .. extra_flags .. ' '
   end
-  cmd = cmd .. files
+  cmd = cmd .. files.. self.QUOTE
+	print("about to run "..cmd)
   local pipe = io.popen(cmd)
   print(pipe:read('*a'))
 end
@@ -210,7 +222,7 @@ function private:doCall(class, method)
   else
     res = self.SELF .. '->' .. res
   end
-  
+
   --- Return value
   local return_value = method.return_value
   if method.return_value then
@@ -246,7 +258,9 @@ function private:copyDubFiles()
   local dub_path = self.COPY_DUB_PATH
   if dub_path then
     local base_path = self.output_directory .. dub_path
-    os.execute(string.format("mkdir -p '%s'", base_path))
+
+		platform.mkdir(base_path)
+
     -- path to current file
     local dir = lk.dir()
     local dub_dir = dir .. '/lua/dub'
@@ -256,6 +270,11 @@ end
 
 -- Detect platform
 function private.platform()
+
+	if platform.type=='windows' then
+		return 'windows'
+	end
+
   local name = io.popen('uname'):read()
   if string.match(name, 'Darwin') then
     return 'macosx'
