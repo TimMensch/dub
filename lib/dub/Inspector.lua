@@ -8,6 +8,8 @@
   parse and create bindings.
 
 --]]------------------------------------------------------
+require 'platform'
+
 local lib     = {
   type = 'dub.Inspector',
   DOXYGEN_CMD = 'doxygen',
@@ -50,10 +52,10 @@ function lib:parse(opts)
       break
     end
   end
-  private.execute('mkdir -p ' .. doc_dir)
+  platform.mkdir(doc_dir)
+
   local doxypath = doc_dir .. '/Doxyfile'
   local doxyfile = io.open(doxypath, 'w')
-
   local doxytemplate = dub.Template {path = lk.dir() .. '/Doxyfile'}
   if type(opts.INPUT) == 'table' then
     opts.INPUT = lk.join(opts.INPUT)
