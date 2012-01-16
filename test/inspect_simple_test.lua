@@ -8,14 +8,13 @@
 
 --]]------------------------------------------------------
 require 'lubyk'
-local should = test.Suite('dub.Inspector')
+local should = test.Suite('dub.Inspector - simple')
 
--- Test helper to prepare the inspector.
-local function makeInspector()
-  local ins = dub.Inspector()
-  ins:parseXml('test/fixtures/simple/doc/xml')
-  return ins
-end
+local ins = dub.Inspector {
+  INPUT   = 'test/fixtures/simple/include',
+  doc_dir = lk.dir() .. '/tmp',
+  keep_xml= true,
+}
 
 --=============================================== TESTS
 function should.loadDub()
@@ -30,55 +29,189 @@ end
 function should.parseXml()
   local simple = dub.Inspector()
   assertPass(function()
-    simple:parse('test/fixtures/simple/doc/xml')
+    simple:parseXml('test/fixtures/simple/doc/xml')
   end)
 end
 
 function should.findSimpleClass()
-  local ins = makeInspector()
   local simple = ins:find('Simple')
   assertEqual('dub.Class', simple.type)
 end
 
+function should.findReturnValueOfCtor()
+  local Simple = ins:find('Simple')
+  local ctor = Simple:method('Simple')
+  assertEqual('Simple *', ctor.return_value.create_name)
+end
+
+function should.findReturnValue()
+  local Simple = ins:find('Simple')
+  local ctor = Simple:method('add')
+  assertEqual('MyFloat ', ctor.return_value.create_name)
+end
+
 function should.findTypedef()
-  local ins = makeInspector()
   local obj = ins:find('MyFloat')
   assertEqual('dub.Typedef', obj.type)
 end
 
-function should.findMemberMethod()
-  local ins = makeInspector()
+function should.resolveTypes()
   local Simple = ins:find('Simple')
-  local obj = Simple:method('value')
-  assertEqual('dub.Function', obj.type)
+  local db = ins.db
+  assertEqual(Simple, db:resolveType(db, 'Simple'))
+  assertEqual(Simple, db:resolveType(Simple, 'Simple'))
+  assertValueEqual({
+    name        = 'double',
+    def         = 'double',
+    create_name = 'MyFloat ',
+  }, db:resolveType(Simple, 'MyFloat'))
+
+  assertValueEqual({
+    name        = 'double',
+    def         = 'double',
+    create_name = 'MyFloat ',
+  }, db:resolveType(db, 'MyFloat'))
+end
+
+function should.findMemberMethod()
+  local Simple = ins:find('Simple')
+  local met = Simple:method('value')
+  assertEqual('dub.Function', met.type)
+  assertEqual(Simple, met.parent)
+  assertTrue(met.member)
+  assertFalse(met.ctor)
+  assertFalse(met.dtor)
+end
+
+function should.findStaticMemberMethod()
+  local Simple = ins:find('Simple')
+  local met = Simple:method('pi')
+  assertTrue(met.static)
+  assertEqual('dub.Function', met.type)
+end
+
+function should.markCtorAsStatic()
+  local Simple = ins:find('Simple')
+  local met = Simple:method('Simple')
+  assertTrue(met.static)
+  assertTrue(met.ctor)
+  assertEqual('dub.Function', met.type)
+end
+
+function should.listMembers()
+  local res = {}
+  for child in ins:children() do
+    table.insert(res, child.name)
+  end
+  assertValueEqual({'Simple', 'MyFloat'}, res)
 end
 
 function should.listMemberMethods()
-  local ins = makeInspector()
   local Simple = ins:find('Simple')
   local res = {}
   for meth in Simple:methods() do
     table.insert(res, meth.name)
   end
-  assertValueEqual({'Simple', '_Simple', 'value', 'add', 'setValue'}, res)
+  assertValueEqual({
+    'Simple',
+    '~Simple',
+    'value',
+    'add',
+    'mul',
+    'addAll',
+    'setValue',
+    'isZero',
+    'pi'}, res)
 end
 
 function should.listParamsOnMethod()
-  local ins = makeInspector()
   local Simple = ins:find('Simple')
   local add = Simple:method('add')
   local names = {}
   local types = {}
   for param in add:params() do
     table.insert(names, param.name) 
-    table.insert(types, param.ctype) 
+    table.insert(types, param.ctype.name) 
   end
   assertValueEqual({'v', 'w'}, names)
-  assertValueEqual({'MyFloat', 'float'}, types)
+  assertValueEqual({'MyFloat', 'double'}, types)
+end
+
+function should.getDefaultParamsInMethod()
+  local Simple = ins:find('Simple')
+  local met = Simple:method('add')
+  local p1 = met.params_list[1]
+  local p2 = met.params_list[2]
+  assertEqual('v', p1.name)
+  assertNil(p1.default)
+  assertEqual('w', p2.name)
+  assertEqual('10', p2.default)
+end
+
+function should.markFunctionWithDefaults()
+  local Simple = ins:find('Simple')
+  local met = Simple:method('add')
+  assertTrue(met.has_defaults)
+  met = Simple:method('Simple')
+  assertFalse(met.has_defaults)
+end
+
+function should.setFirstDefaultPositionInFunction()
+  local Simple = ins:find('Simple')
+  local met = Simple:method('add')
+  assertTrue(met.has_defaults)
+  assertEqual(2, met.first_default)
+  met = Simple:method('Simple')
+  assertFalse(met.has_defaults)
+end
+
+function should.detectOverloadFunctions()
+  local Simple = ins:find('Simple')
+  local met = Simple:method('add')
+  assertTrue(met.overloaded)
+  local met = Simple:method('mul')
+  assertTrue(met.overloaded)
+end
+
+--=============================================== Overloaded
+
+function should.haveOverloadedList()
+  local Simple = ins:find('Simple')
+  local met = Simple:method('add')
+  local res = {}
+  for _, m in ipairs(met.overloaded) do
+    table.insert(res, m.sign)
+  end
+  assertValueEqual({
+    'MyFloat, double',
+    'Simple',
+  }, res)
+  
+  met = Simple:method('mul')
+  res = {}
+  for _, m in ipairs(met.overloaded) do
+    table.insert(res, m.sign)
+  end
+  assertValueEqual({
+    'Simple',
+    'double',
+    'double, double',
+    '',
+  }, res)
+  
+  met = Simple:method('addAll')
+  res = {}
+  for _, m in ipairs(met.overloaded) do
+    table.insert(res, m.sign)
+  end
+  assertValueEqual({
+    'double, double, double',
+    'double, double, double, char',
+  }, res)
 end
 
 function should.resolveNativeTypes()
-  local ins = makeInspector()
-  assertEqual('float', ins:resolveType('MyFloat'))
+  assertEqual('double', ins:resolveType('MyFloat').name)
 end
+
 test.all()

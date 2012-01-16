@@ -6,7 +6,18 @@
   A public class method or function definition.
 
 --]]------------------------------------------------------
-local lib     = {type = 'dub.Function'}
+local lib     = {
+  type = 'dub.Function',
+  OP_TO_NAME = {
+    ['+']  = 'add',
+    ['-']  = 'sub',
+    ['*']  = 'mul',
+    ['/']  = 'div',
+    ['=='] = 'eq',
+    ['<']  = 'lt',
+    ['<='] = 'le',
+  }
+}
 local private = {}
 lib.__index   = lib
 dub.Function  = lib
@@ -14,8 +25,13 @@ dub.Function  = lib
 --=============================================== dub.Function()
 setmetatable(lib, {
   __call = function(lib, self)
+    self.dub = self.dub or {}
+    self.static = self.static or self.ctor
+    self.has_defaults = self.params_list.first_default and true
+    self.first_default= self.params_list.first_default
     setmetatable(self, lib)
-    private.parseName(self)
+    self:setName(self.name)
+    self.sign = private.makeSignature(self)
     return self
   end
 })
@@ -39,21 +55,49 @@ end
 
 function lib:neverThrows()
   -- TODO: inspect xml
-  return false
+  return self.is_set_attr or
+         self.is_get_attr or
+         self.is_cast
+end
+
+function lib:setName(name)
+  self.name = name
+  if string.match(self.name, '^~') then
+    self.destructor = true
+    self.cname = string.gsub(self.name, '~', '_')
+  elseif string.match(name, '^operator') then
+    local n = string.match(name, '^operator(.+)$')
+    local op = self.OP_TO_NAME[n]
+    if n == '-' and #self.params_list == 0 then
+      -- Special case for '-' (minus/unary minus).
+      op = 'unm'
+    end
+    if op then
+      self.cname = 'operator_' .. op
+    else
+      print(name)
+    end
+  else
+    self.cname = self.name
+  end
 end
 --=============================================== PRIVATE
 
-function private.paramsIterator(parent)
-  for _, param in ipairs(parent.sorted_params) do
+function private:paramsIterator()
+  for _, param in ipairs(self.params_list) do
     coroutine.yield(param)
   end
 end
 
-function private:parseName()
-  if string.match(self.name, '^~') then
-    self.destructor = true
-    self.name = string.gsub(self.name, '~', '_')
-  else
-    self.bind_name = self.name
+-- Create a string identifying the met type for overloading. This is just
+-- a concatenation of param type names.
+function private.makeSignature(met)
+  local res = ''
+  for param in met:params() do
+    if res ~= '' then
+      res = res .. ', '
+    end
+    res = res .. param.ctype.name
   end
+  return res
 end

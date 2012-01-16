@@ -29,6 +29,16 @@
 #ifndef DUB_BINDING_GENERATOR_DUB_H_
 #define DUB_BINDING_GENERATOR_DUB_H_
 
+#ifndef DUB_ASSERT_KEY
+#define DUB_ASSERT_KEY(k, m) strcmp(k, m)
+// Use this to avoid the overhead of strcmp in get/set of public attributes.
+// if you avoid strcmp, bad keys can map to any other key.
+//#define DUB_ASSERT_KEY(k, m) false
+#endif
+#define KEY_EXCEPTION_MSG "invalid key '%s'"
+
+typedef int DubStackSize;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -68,8 +78,10 @@ public:
   explicit TypeException(lua_State *L, int narg, const char *type, bool is_super = false);
 };
 
+} // dub
+
 // ======================================================================
-// =============================================== dub::pushudata
+// =============================================== dub_pushclass
 // ======================================================================
 
 /** Push a custom type on the stack.
@@ -77,10 +89,36 @@ public:
  * using 'new' and Lua can safely call delete when it needs to garbage-
  * -collect it.
  */
-void pushudata(lua_State *L, void *ptr, const char *type_name);
+void dub_pushudata(lua_State *L, void *ptr, const char *type_name);
+
+template<class T>
+struct DubUserdata {
+  T *ptr;
+  T obj;
+};
+
+template<class T>
+void dub_pushfulldata(lua_State *L, const T &obj, const char *type_name) {
+  DubUserdata<T> *copy = (DubUserdata<T>*)lua_newuserdata(L, sizeof(DubUserdata<T>));
+  copy->obj = obj;
+  // now **copy gives back the object.
+  copy->ptr = &copy->obj;
+
+  // the userdata is now on top of the stack
+
+  // set metatable (contains methods)
+  luaL_getmetatable(L, type_name);
+  lua_setmetatable(L, -2);
+}
+
+template<class T>
+void dub_pushclass(lua_State *L, const T &obj, const char *type_name) {
+  T *copy = new T(obj);
+  dub_pushudata(L, (void*)copy, type_name);
+}
 
 // ======================================================================
-// =============================================== dub::pushclass
+// =============================================== dub_pushclass2
 // ======================================================================
 
 /** Push a custom type on the stack and give it the pointer to the userdata.
@@ -88,7 +126,7 @@ void pushudata(lua_State *L, void *ptr, const char *type_name);
  * invalidates the userdatum by calling 
  */
 template<class T>
-void pushclass(lua_State *L, T *ptr, const char *type_name) {
+void dub_pushclass2(lua_State *L, T *ptr, const char *type_name) {
   T **userdata = (T**)lua_newuserdata(L, sizeof(T*));
   *userdata = ptr;
 
@@ -102,7 +140,17 @@ void pushclass(lua_State *L, T *ptr, const char *type_name) {
   // <udata>
 }
 
-} // dub
+// ======================================================================
+// =============================================== constants
+// ======================================================================
+
+typedef struct dub_const_Reg {
+  const char *name;
+  double value;
+} dub_const_Reg;
+
+// register constants in the table at the top
+void dub_register_const(lua_State *L, const dub_const_Reg *l);
 
 // ======================================================================
 // =============================================== dub_check ...
@@ -111,22 +159,33 @@ void pushclass(lua_State *L, T *ptr, const char *type_name) {
 // These provide the same funcionality as their equivalent luaL_check... but they
 // throw std::exception which can be caught (eventually to call lua_error).
 lua_Number dub_checknumber(lua_State *L, int narg) throw(dub::TypeException);
-lua_Number dub_checkint(lua_State *L, int narg) throw(dub::TypeException);
+lua_Integer dub_checkint(lua_State *L, int narg) throw(dub::TypeException);
 const char *dub_checklstring(lua_State *L, int narg, size_t *len) throw(dub::TypeException);
 lua_Integer dub_checkinteger(lua_State *L, int narg) throw(dub::TypeException);
-void *dub_checkudata(lua_State *L, int ud, const char *tname) throw(dub::TypeException);
+void *dub_checkudata(lua_State *L, int ud, const char *tname, bool keep_mt = false) throw(dub::TypeException);
 
 // Super aware userdata calls (finds userdata inside provided table with table.super).
-void *dub_checksdata(lua_State *L, int ud, const char *tname) throw(dub::TypeException);
+void *dub_checksdata(lua_State *L, int ud, const char *tname, bool keep_mt = false) throw(dub::TypeException);
 // Does not throw exceptions. This method behaves exactly like luaL_checkudata but searches
 // for table.super before calling lua_error.
-void *dub_checksdata_n(lua_State *L, int ud, const char *tname) throw();
+void *dub_checksdata_n(lua_State *L, int ud, const char *tname, bool keep_mt = false) throw();
 
 #define dub_checkstring(L,n) (dub_checklstring(L, (n), NULL))
 #define dub_checkint(L,n) ((int)dub_checkinteger(L, (n)))
+#define luaL_checkboolean(L,n) (lua_toboolean(L,n))
+#define dub_checkboolean(L,n) (lua_toboolean(L,n))
 
 // ======================================================================
 // =============================================== dub_register
 // ======================================================================
 void dub_register(lua_State *L, const char *libname, const char *class_name);
+
+// ======================================================================
+// =============================================== dub_hash
+// ======================================================================
+// sdbm function: taken from http://www.cse.yorku.ca/~oz/hash.html
+// This version is slightly adapted to cope with different
+// hash sizes (and to be easy to write in Lua).
+int dub_hash(const char *str, int sz);
+  
 #endif // DUB_BINDING_GENERATOR_DUB_H_

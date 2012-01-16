@@ -8,14 +8,18 @@
  */
 #include "dub/dub.h"
 {% for h in class:headers() do %}
-#include "{{h.path}}"
+#include "{{h}}"
 {% end %}
 
 {% for method in class:methods() do %}
 /** {{method:fullname()}}
  * {{method.location}}
  */
-static int {{class.name}}_{{method.name}}(lua_State *L) {
+static int {{class.name}}_{{method.cname}}(lua_State *L) {
+{% if method:neverThrows() then %}
+
+  {| self:functionBody(class, method) |}
+{% else %}
   try {
     {| self:functionBody(class, method) |}
   } catch (std::exception &e) {
@@ -24,27 +28,29 @@ static int {{class.name}}_{{method.name}}(lua_State *L) {
     lua_pushfstring(L, "{{method.name}}: Unknown exception");
   }
   return lua_error(L);
+{% end %}
 }
 
 {% end %}
 
-/* ====================================== Methods registration */
+// --=============================================== METHODS
 
 static const struct luaL_Reg {{class.name}}_member_methods[] = {
-{% for method in class:methods() do 
-  if not method.static then %}
-  { {{string.format('%-15s, %-20s', '"'..self:bindName(method)..'"', class.name .. '_' .. method.name)}} },
-{% end; end %}
-  {NULL, NULL},
+{% for method in class:methods() do %}
+  { {{string.format('%-15s, %-20s', '"'..self:bindName(method)..'"', class.name .. '_' .. method.cname)}} },
+{% end %}
+  { NULL, NULL},
 };
 
-static const struct luaL_Reg {{class.name}}_namespace_methods[] = {
-{% for method in class:methods() do 
-  if method.static then %}
-  { {{string.format('%-15s, %-20s', '"'..self:bindName(method)..'"', class.name .. '_' .. method.name)}} },
-{% end; end %}
-  {NULL, NULL},
+{% if class.has_constants then %}
+// --=============================================== CONSTANTS
+static const struct dub_const_Reg {{class.name}}_const[] = {
+{% for const in class:constants() do %}
+  { {{string.format('%-15s, %-20s', '"'.. const ..'"', class.name..'::'..const)}} },
+{% end %}
+  { NULL, NULL},
 };
+{% end %}
 
 #ifdef DUB_LUA_LOAD
 // These bindings are part of a larger library.
@@ -55,22 +61,16 @@ extern "C" int luaopen_{{class.name}}(lua_State *L)
 {
   // Create the metatable which will contain all the member methods
   luaL_newmetatable(L, "{{self:libName(class)}}");
-
-  // metatable.__index = metatable (find methods in the table itself)
-  lua_pushvalue(L, -1);
-  lua_setfield(L, -2, "__index");
+  // <mt>
+{% if class.has_constants then %}
+  // register class constants
+  dub_register_const(L, {{class.name}}_const);
+{% end %}
 
   // register member methods
   luaL_register(L, NULL, {{ class.name }}_member_methods);
-  // save meta-table in {{self:libName(class)}}_
-  {% if class.parent then %}
+  // save meta-table in {{self:libName(class.parent)}}
   dub_register(L, "{{self:libName(class.parent)}}", "{{class.name}}");
-  // register class methods in {{parent.name}}
-  luaL_register(L, "{{self:libName(class.parent)}}", {{class.name}}_namespace_methods);
-  {% else %}
-  dub_register(L, "_G", "{{class.name}}");
-  // register class methods
-  luaL_register(L, "_G", {{class.name}}_namespace_methods);
-{% end %}
+
   return 1;
 }

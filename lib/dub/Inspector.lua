@@ -42,14 +42,18 @@ function lib:parse(opts)
   if type(opts) == 'string' then
     opts = {INPUT = opts}
   end
-  local doc_dir = opts.doc_dir or 'dub-tmp'
-  local i = 0
-  while true do
-    if lk.exist(doc_dir) then
-      i = i + 1
-      doc_dir = string.format('dub-tmp-%i', i)
-    else
-      break
+  assert(opts.INPUT, "Missing 'INPUT' field")
+  local doc_dir = opts.doc_dir
+  if not doc_dir then
+    doc_dir = 'dub-tmp'
+    local i = 0
+    while true do
+      if lk.exist(doc_dir) then
+        i = i + 1
+        doc_dir = string.format('dub-tmp-%i', i)
+      else
+        break
+      end
     end
   end
   platform.mkdir(doc_dir)
@@ -68,8 +72,12 @@ function lib:parse(opts)
   self:doxygen(doxypath)
   -- Parse xml
   self:parseXml(doc_dir .. '/xml', true)
-  if not opts.doc_dir then
-    lk.rmTree(doc_dir, true)
+  if not opts.keep_xml then
+    if not opts.doc_dir then
+      lk.rmTree(doc_dir, true)
+    else
+      lk.rmTree(doc_dir .. '/xml', true)
+    end
   end
 end
 
@@ -86,9 +94,14 @@ function lib:find(name)
   return self.db:findByFullname(name)
 end
 
+-- Return an interator on all children known to the inspector.
+function lib:children()
+  return self.db:children()
+end
+
 --- Try to follow typedefs to resolve a type
 function lib:resolveType(name)
-  return self.db:resolveType(name)
+  return self.db:resolveType(self.db, name)
 end
 --=============================================== PRIVATE
 
