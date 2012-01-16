@@ -28,8 +28,13 @@ setmetatable(lib, {
       self = source
       -- Grab source from path...
       local file = io.open(self.path, 'r')
-      self.source = file:read('*a')
-      file:close()
+      if file then
+        self.source = file:read('*a')
+        file:close()
+      else
+        print("Failed to open "..tostring(self.path))
+        os.exit(-1)
+      end
     end
     setmetatable(self, lib)
     self.lua = self:parse(self.source)
@@ -42,7 +47,7 @@ setmetatable(lib, {
   end
 })
 
--- Create Lua code from the template string. 
+-- Create Lua code from the template string.
 function lib:parse(source)
   local res = ''
   local eat_next_newline
@@ -102,5 +107,5 @@ function lib:run(env)
   self.func()
   return buffer_
 end
-  
+
 --=============================================== PRIVATE
