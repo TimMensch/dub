@@ -26,6 +26,8 @@ setmetatable(lib, {
       cache          = {},
       sorted_cache   = {},
       functions_list = {},
+      constants_list = {},
+      const_headers  = {},
     }
     return setmetatable(self, lib)
   end
@@ -77,10 +79,21 @@ function lib:functions(parent)
   -- make sure we have parsed the headers
   private.parseHeaders(parent)
   local co = coroutine.create(private.iteratorWithSuper)
+  local seen = {}
   return function()
-    local ok, elem = coroutine.resume(co, parent, 'functions_list')
-    if ok then
-      return elem
+    local ok, elem
+    -- For this first version, just ignore super methods with same name:
+    -- no handling of overloaded functions through inheritance chain.
+    while true do
+      local ok, elem = coroutine.resume(co, parent, 'functions_list')
+      if ok and elem then
+        if not seen[elem.name] then
+          seen[elem.name] = true
+          return elem
+        end
+      else
+        return nil
+      end
     end
   end
 end
@@ -142,10 +155,27 @@ end
 function lib:constants(parent)
   -- make sure we have parsed the headers
   private.parseHeaders(self)
-  private.parseHeaders(parent)
+  if parent then
+    private.parseHeaders(parent)
+  else
+    parent = self
+  end
   local co = co or coroutine.create(private.iterator)
   return function()
     local ok, elem = coroutine.resume(co, parent.constants_list)
+    if ok then
+      return elem
+    end
+  end
+end
+
+--- Return an iterator over the headers where constants are defined.
+function lib:constHeaders()
+  -- make sure we have parsed the headers
+  private.parseHeaders(self)
+  local co = co or coroutine.create(private.iterator)
+  return function()
+    local ok, elem = coroutine.resume(co, self.const_headers)
     if ok then
       return elem
     end
@@ -203,6 +233,7 @@ function private.iterator(list)
 end
 
 function private.iteratorWithSuper(elem, key)
+  private.iterator(elem[key])
   if elem.type == 'dub.Class' then
     for super in elem:superclasses() do
       for _, child in ipairs(super[key]) do
@@ -214,7 +245,6 @@ function private.iteratorWithSuper(elem, key)
       end
     end
   end
-  private.iterator(elem[key])
 end
 
 -- Iterate superclass hierarchy.
@@ -295,10 +325,6 @@ function parse:children(elem_list, header, not_lazy)
       --print('skipping', elem.xml)
     end
   end
-  -- Create --get--, --set-- and ~Destructor if needed.
-  if self.is_class then
-    private.makeSpecialMethods(self)
-  end
 end
 
 function parse:basecompoundref(elem, header)
@@ -328,6 +354,8 @@ function parse:innerclass(elem, header, not_lazy)
   if not_lazy then
     private.parseAll(class)
   end
+  -- Create --get--, --set-- and ~Destructor if needed.
+  private.makeSpecialMethods(class)
   return class
 end
 
@@ -347,6 +375,8 @@ function parse:sectiondef(elem, header)
   local kind = elem.kind
   if kind == 'public-func' or 
      -- methods
+     kind == 'enum' or
+     -- global enum
      kind == 'typedef' or
      -- typedef
      kind == 'public-attrib' or
@@ -359,6 +389,23 @@ function parse:sectiondef(elem, header)
      -- enum, sub-types
      then
     parse.children(self, elem, header)
+    if kind == 'enum' then
+      -- global enum
+      table.insert(self.const_headers, header.file)
+    end
+  elseif kind == 'private-func' then
+    -- private methods (to detect private dtor)
+    for _, elem in ipairs(elem) do
+      if elem.xml == 'memberdef' and
+         elem.kind == 'function' then
+
+        local name = elem:find('name')[1]
+        if name == '~' .. self.name then
+          -- Private dtor
+          self.cache[name] = 'private'
+        end
+      end
+    end
   end
 end
 
@@ -417,9 +464,15 @@ function parse:enum(elem, header)
     list     = list,
     ctype    = lib.makeType('double'),
   }
-  enum.ctype.cast = self:fullname() .. '::' .. name
-  enum.ctype.create_name = self:fullname() .. '::' .. name .. ' '
-  enum.ctype.scope = self:fullname()
+  if self.name then
+    enum.ctype.cast = self:fullname() .. '::' .. name
+    enum.ctype.create_name = self:fullname() .. '::' .. name .. ' '
+    enum.ctype.scope = self:fullname()
+  else
+    enum.ctype.cast = name
+    enum.ctype.create_name = name .. ' '
+  end
+
   self.has_constants = true
   return enum
 end
@@ -470,6 +523,7 @@ parse['function'] = function(self, elem, header)
     child.is_get_attr  = true
     child.index_op     = child
     child.name         = self.GET_ATTR_NAME
+    child.cname        = self.GET_ATTR_NAME
     local exist = self.cache[self.GET_ATTR_NAME]
     if exist then
       exist.index_op = child
@@ -586,7 +640,7 @@ function private:makeDestructor()
   local child = dub.Function {
     db            = self.db,
     parent        = self,
-    name          = '_' .. name,
+    name          = '~' .. name,
     params_list   = {},
     return_value  = nil,
     definition    = '~' .. name,
@@ -600,7 +654,6 @@ function private:makeDestructor()
   }
   table.insert(self.functions_list, child)
   self.cache['~' .. name] = child
-  self.cache['_' .. name] = child
 end
 
 function private:makeSpecialMethods()
