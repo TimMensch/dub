@@ -62,7 +62,7 @@ function lib:parse(opts)
   local doxyfile = io.open(doxypath, 'w')
   local doxytemplate = dub.Template {path = lk.dir() .. '/Doxyfile'}
   if type(opts.INPUT) == 'table' then
-    opts.INPUT = lk.join(opts.INPUT)
+    opts.INPUT = lk.join(opts.INPUT, ' ')
   end
 
   -- Generate Doxyfile

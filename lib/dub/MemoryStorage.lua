@@ -152,25 +152,46 @@ function lib:constants(parent)
   end
 end
 
-function lib:resolveType(parent, name)
+local function resolveOne(scope, name)
+  local t = scope:findChild(name)
+  if t then
+    if t.type == 'dub.Class' then
+      -- real type
+      return t
+    elseif t.type == 'dub.Typedef' or
+      t.type == 'dub.Enum' then
+      -- alias type
+      return t.ctype
+    end
+  end
+end
+
+function lib:resolveType(scope, name)
   -- Do we have a typedef or enum ?
-  local td
-  while parent do
-    td = parent:findChild(name)
-    if td then
-      if td.type == 'dub.Class' then
-        -- real type
-        return td
-      elseif td.type == 'dub.Typedef' or
-        td.type == 'dub.Enum' then
-        -- alias type
-        return td.ctype
+  -- Look in nested scopes
+  local t
+  while scope do
+    t = resolveOne(scope, name)
+    if t then
+      return t
+    end
+    if scope.type == 'dub.Class' then
+      -- Look in superclasses
+      for super in scope:superclasses() do
+        t = resolveOne(super, name)
+        if t then
+          return t
+        end
       end
     end
-    parent = parent.parent
+    scope = scope.parent
   end
   -- not found (could be a native type)
   return nil
+end
+
+function lib:fullname()
+  return self.name
 end
 
 --=============================================== PRIVATE
@@ -251,8 +272,8 @@ function parse:header(header, not_lazy)
   local data = xml.load(header.path):find('compounddef')
   local h_path = data:find('location').file
   local base, h_file = lk.directory(h_path)
-  header.h_file = h_file
-  table.insert(self.headers_list, h_file)
+  header.file = h_path
+  self.header = h_path
 
   self.dub = parse.dub(data) or self.dub
   parse.children(self, data, header, not_lazy)
@@ -315,7 +336,7 @@ function parse:templateparamlist(elem, header)
   setmetatable(self, dub.CTemplate)
   self.template_params = {}
   for _, param in ipairs(elem) do
-    local name = param:find('type')[1]
+    local name = private.flatten(param:find('type')[1])
     name = string.gsub(name, 'class ', '')
     name = string.gsub(name, 'typename ', '')
     table.insert(self.template_params, name)
@@ -360,13 +381,21 @@ end
 function parse:variable(elem, header)
   local name = elem:find('name')[1]
   local child  = {
-    name   = name,
-    type   = 'dub.Attribute',
-    ctype  = parse.type(elem),
-    static = elem.static == 'yes',
+    name       = name,
+    type       = 'dub.Attribute',
+    ctype      = parse.type(elem),
+    static     = elem.static == 'yes',
+    argsstring = elem:find('argsstring')[1],
   }
-  self.has_variables = true
-  table.insert(self.variables_list, child)
+  local dim = child.argsstring and string.match(child.argsstring, '^%[(.*)%]$')
+  if dim then
+    child.array_dim = dim
+    -- Transform into two dub.Function name(int) and set_name(int)
+    private.makeAttrArrayMethods(self, child)
+  else
+    self.has_variables = true
+    table.insert(self.variables_list, child)
+  end
   return child
 end
 
@@ -403,7 +432,7 @@ function parse:typedef(elem, header)
     desc        = (elem:find('detaileddescription') or {})[1],
     xml         = elem,
     definition  = elem:find('definition')[1],
-    header_file = header.h_file,
+    header_path = header.file,
   }
   typ.ctype.create_name = typ.name .. ' '
   return typ
@@ -436,6 +465,18 @@ parse['function'] = function(self, elem, header)
   if self.name == name then
     -- Constructor
     child.return_value = lib.makeType(name .. ' *')
+  elseif name == 'operator[]' then
+    -- Special case for index method
+    child.is_get_attr  = true
+    child.index_op     = child
+    child.name         = self.GET_ATTR_NAME
+    local exist = self.cache[self.GET_ATTR_NAME]
+    if exist then
+      exist.index_op = child
+      return nil
+    else
+      child.index_op = child
+    end
   end
 
   local exist = self.cache[name]
@@ -573,6 +614,37 @@ function private:makeSpecialMethods()
 end
 
 -- self == class
+function private:makeAttrArrayMethods(attr)
+  local name = attr.name
+  local child = dub.Function {
+    db            = self.db,
+    parent        = self,
+    name          = attr.name,
+    params_list   = {{
+      type     = 'dub.Param',
+      name     = 'i',
+      position = 1,
+      ctype    = lib.makeType('size_t'),
+    }},
+    return_value  = attr.ctype,
+    definition    = 'Read ' .. name,
+    argsstring    = '(size_t i)',
+    location      = '',
+    desc          = 'Read attribute '..name..' for ' .. self.name .. '.',
+    static        = false,
+    xml           = nil,
+    -- Should not be inherited by sub-classes
+    no_inherit    = true,
+    member        = true,
+    array_get     = true,
+    array_dim     = attr.array_dim,
+  }
+  table.insert(self.functions_list, child)
+  table.insert(self.sorted_cache, child)
+  self.cache[child.name] = child
+end
+
+-- self == class
 function private:makeGetAttribute()
   if not self.has_variables or
      self.cache[self.GET_ATTR_NAME] then
@@ -705,7 +777,7 @@ function private:resolveTypedef(elem)
         self.cache[class.name] = class
         table.insert(self.sorted_cache, class)
         class.typedef = elem.definition .. ';'
-        table.insert(class.headers_list, elem.header_file)
+        class.header  = elem.header_path
         return class
       end
     end
