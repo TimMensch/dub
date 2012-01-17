@@ -11,6 +11,7 @@ param_
     * accessing complex public members.
     * accessing public members
     * return value optimization
+    * library prefix and single library file (require 'MyLib', MyLib.Vect)
 
 --]]------------------------------------------------------
 require 'lubyk'
@@ -25,11 +26,27 @@ local ins = dub.Inspector {
 
 --=============================================== Special types
 function should.resolveStdString()
-  local Box  = ins:find('Box')
-  local ctor = Box:method('Box')
-  local res  = binder:functionBody(Box, ctor)
+  local Box = ins:find('Box')
+  local met = Box:method('Box')
+  local res = binder:functionBody(Box, met)
   assertMatch('size_t name_sz_;', res)
   assertMatch('const char %*name = dub_checklstring%(L, 1, %&name_sz_%);', res)
+end
+
+function should.notGcReturnedPointer()
+  local Box = ins:find('Box')
+  local met = Box:method('size')
+  local res = binder:functionBody(Box, met)
+  -- no gc
+  assertMatch('pushudata[^\n]+, false%);', res)
+end
+
+function should.gcReturnedPointerMarkedAsGc()
+  local Box = ins:find('Box')
+  local met = Box:method('copySize')
+  local res = binder:functionBody(Box, met)
+  -- no gc
+  assertMatch('pushudata[^\n]+, true%);', res)
 end
 
 --=============================================== Set/Get vars.
@@ -48,19 +65,37 @@ end
 function should.bindComplexSetMethod()
   -- __newindex for non-native types
   local Box = ins:find('Box')
-  local set = Box:method(Box.SET_ATTR_NAME)
   local res = binder:bindClass(Box)
   assertMatch('__newindex.*Box__set_', res)
+  local set = Box:method(Box.SET_ATTR_NAME)
   local res = binder:functionBody(Box, set)
   assertMatch('self%->size_ = %*%*%(%(Vect%*%*%)', res)
+end
+
+function should.ignoreArrayAttrInSet()
+  -- __newindex for non-native types
+  local Vect = ins:find('Vect')
+  local res = binder:bindClass(Vect)
+  assertMatch('"d".*Vect_d', res)
+  local set = Vect:method(Vect.SET_ATTR_NAME)
+  local res = binder:functionBody(Vect, set)
+  assertNotMatch('self%->d ', res)
+end
+
+function should.ignoreArrayAttrInGet()
+  -- __newindex for simple (native) types
+  local Vect = ins:find('Vect')
+  local get = Vect:method(Vect.GET_ATTR_NAME)
+  local res = binder:functionBody(Vect, get)
+  assertNotMatch('self%->d', res)
 end
 
 function should.bindSimpleGetMethod()
   -- __newindex for simple (native) types
   local Vect = ins:find('Vect')
-  local get = Vect:method(Vect.GET_ATTR_NAME)
   local res = binder:bindClass(Vect)
   assertMatch('__index.*Vect__get_', res)
+  local get = Vect:method(Vect.GET_ATTR_NAME)
   local res = binder:functionBody(Vect, get)
   assertMatch('lua_pushnumber%(L, self%->x%);', res)
   -- static member
@@ -85,41 +120,177 @@ function should.notGetSelfInStaticMethod()
   assertNotMatch('self', res)
 end
 
+function should.createLibFileWithCustomNames()
+  local tmp_path = 'test/tmp'
+  lk.rmTree(tmp_path, true)
+
+  os.execute('mkdir -p '..tmp_path)
+  -- Our binder resolves types differently due to MyLib so we
+  -- need our own inspector.
+  local ins = dub.Inspector {
+    INPUT    = 'test/fixtures/pointers',
+    doc_dir  = lk.dir() .. '/tmp',
+  }
+  local binder = dub.LuaBinder()
+  function binder:name(elem)
+    local name = elem.name
+    if name == 'Vect' then
+      return 'V'
+    elseif name == 'Box' then
+      return 'B'
+    end
+  end
+  binder:bind(ins, {
+    output_directory = tmp_path,
+    -- Execute all lua_open in a single go
+    -- with lua_MyLib.
+    -- This creates a MyLib_open.cpp file
+    -- that has to be included in build.
+    single_lib = 'foo',
+    -- Forces classes to live in MyLib.Foobar
+    lib_prefix = 'foo',
+  })
+  local res = lk.readall(tmp_path .. '/V.cpp')
+  assertMatch('"foo.V"', res)
+  assertMatch('luaopen_V%(', res)
+
+  assertPass(function()
+    -- Build foo.so
+    binder:build {
+      output   = 'test/tmp/foo.so',
+      inputs   = {
+        'test/tmp/dub/dub.cpp',
+        'test/tmp/V.cpp',
+        'test/tmp/B.cpp',
+        'test/tmp/foo.cpp',
+        'test/fixtures/pointers/vect.cpp',
+      },
+      includes = {
+        'test/tmp',
+      },
+    }
+    package.cpath = tmp_path .. '/?.so'
+    -- Must require Vect first because Box depends on Vect class and
+    -- only Vect.so has static members for Vect.
+    require 'foo'
+    assertType('table', foo.V)
+    assertType('table', foo.B)
+  end, function()
+    -- teardown
+    package.loaded.foo = nil
+    package.cpath = cpath_bak
+    if not foo then
+      test.abort = true
+    end
+  end)
+end
+
+function should.useVectInMyLib()
+  local v = foo.V(2,2.5)
+  assertEqual('foo.V', v.type)
+  assertEqual(5, v:surface())
+end
+
+function should.createLibFile()
+  local tmp_path = 'test/tmp'
+  -- Our binder resolves types differently due to MyLib so we
+  -- need our own inspector.
+  local ins = dub.Inspector {
+    INPUT    = 'test/fixtures/pointers',
+    doc_dir  = lk.dir() .. '/tmp',
+  }
+
+  os.execute('mkdir -p ' .. tmp_path)
+  binder:bind(ins, {
+    output_directory = tmp_path,
+    -- Execute all lua_open in a single go
+    -- with lua_MyLib.
+    -- This creates a MyLib_open.cpp file
+    -- that has to be included in build.
+    single_lib = 'MyLib',
+    -- Forces classes to live in MyLib.Foobar
+    lib_prefix = 'MyLib',
+  })
+
+  assertTrue(lk.exist(tmp_path .. '/MyLib.cpp'))
+  local res = lk.readall(tmp_path .. '/MyLib.cpp')
+  assertMatch('int luaopen_Box%(lua_State %*L%);', res)
+  assertMatch('int luaopen_Vect%(lua_State %*L%);', res)
+  assertMatch('luaopen_MyLib%(lua_State %*L%) %{', res)
+  assertMatch('luaopen_Box%(L%);', res)
+  assertMatch('luaopen_Vect%(L%);', res)
+  local res = lk.readall(tmp_path .. '/Vect.cpp')
+  assertMatch('"MyLib.Vect"', res)
+
+  assertPass(function()
+    -- Build MyLib.so
+    binder:build {
+      output   = 'test/tmp/MyLib.so',
+      inputs   = {
+        'test/tmp/dub/dub.cpp',
+        'test/tmp/Vect.cpp',
+        'test/tmp/Box.cpp',
+        'test/tmp/MyLib.cpp',
+        'test/fixtures/pointers/vect.cpp',
+      },
+      includes = {
+        'test/tmp',
+      },
+    }
+    package.cpath = tmp_path .. '/?.so;'
+    -- Must require Vect first because Box depends on Vect class and
+    -- only Vect.so has static members for Vect.
+    require 'MyLib'
+    assertType('table', MyLib.Vect)
+    assertType('table', MyLib.Box)
+  end, function()
+    -- teardown
+    package.loaded.MyLib = nil
+    package.cpath = cpath_bak
+    if not MyLib then
+      test.abort = true
+    end
+  end)
+end
+
+function should.useVectInMyLib()
+  local v = MyLib.Vect(2,2.5)
+  assertEqual('MyLib.Vect', v.type)
+  assertEqual(5, v:surface())
+end
+
 function should.bindCompileAndLoad()
   -- create tmp directory
   local tmp_path = lk.dir() .. '/tmp'
   os.execute("mkdir -p "..tmp_path)
 
   binder:bind(ins, {output_directory = tmp_path})
+
   local cpath_bak = package.cpath
   assertPass(function()
     
     -- Build Vect.so
     binder:build {
-      work_dir = lk.dir(),
-      output   = 'tmp/Vect.so',
+      output   = 'test/tmp/Vect.so',
       inputs   = {
-        'tmp/dub/dub.cpp',
-        'tmp/Vect.cpp',
-        'fixtures/pointers/vect.cpp',
+        'test/tmp/dub/dub.cpp',
+        'test/tmp/Vect.cpp',
+        'test/fixtures/pointers/vect.cpp',
       },
       includes = {
-        'tmp',
-        'fixtures/pointers',
+        'test/tmp',
       },
     }
     
     -- Build Box.so
     binder:build {
-      work_dir = lk.dir(),
-      output   = 'tmp/Box.so',
+      output   = 'test/tmp/Box.so',
       inputs   = {
-        'tmp/dub/dub.cpp',
-        'tmp/Box.cpp',
+        'test/tmp/dub/dub.cpp',
+        'test/tmp/Box.cpp',
       },
       includes = {
-        'tmp',
-        'fixtures/pointers',
+        'test/tmp',
       },
     }
     package.cpath = tmp_path .. '/?.so'
@@ -161,6 +332,26 @@ function should.writeVectAttributes()
   assertEqual(51, v:surface())
 end
 
+function should.readArrayAttributes()
+  local v = Vect(1,2)
+  assertEqual(4, v:d(1))
+  assertEqual(5, v:d(2))
+  assertEqual(6, v:d(3))
+  assertNil(v:d(0))
+  assertNil(v:d(4))
+end
+
+function should.writeArrayAttributes()
+  local v = Vect(1,2)
+  --v.set_d(1, 10)
+  -- Could enable : v.d[1] = 1.5
+  -- by doing some work on a DubObject:
+  -- v.d          ==> return {self = self, key = 'd'}
+  -- v.d[1] = 1.5 ==> function __newindex({self=self, key='d'}, k, v)
+  --                     self._d_set(k, v)
+  --                  end
+  --assertEqual(13, v.d(1))
+end
 
 function should.accessStaticAttributes()
   local t, v = Vect(1,1), Vect(1,1)
@@ -246,6 +437,34 @@ function should.overloadEqual()
   assertFalse(v1 == s2)
   assertTrue(v1 == Vect(7,2))
 end
+
+function should.overloadCall()
+  local v1 = Vect(7, 2)
+  assertEqual(7, v1(1))
+  assertEqual(2, v1(2))
+end
+
+function should.overloadIndex()
+  local v1 = Vect(7, 2)
+  assertEqual(7, v1[1])
+  assertEqual(2, v1[2])
+end
+
+-- operator+=
+function should.overloadAdde()
+  local v = Vect(7, 2)
+  v:add(Vect(3,2))
+  assertEqual(10, v.x)
+  assertEqual(4, v.y)
+end
+
+-- operator-=
+function should.overloadSube()
+  local v = Vect(7, 2)
+  v:sub(Vect(3,2))
+  assertEqual(4, v.x)
+  assertEqual(0, v.y)
+end
 --=============================================== Box
 
 function should.createBoxObject()
@@ -259,6 +478,43 @@ function should.readBoxAttributes()
   local sz = v.size_
   assertEqual(2, sz.x)
   assertEqual(3, sz.y)
+end
+
+-- Changes should propagate back to Vect in Box.
+function should.notCopyPointer()
+  local b = Box('Cat', Vect(2,3))
+  local sz = b:size()
+  sz.x = 5
+  assertEqual(5, b.size_.x)
+end
+
+-- Changes should propagate back to Vect in Box.
+function should.notCopyAttribute()
+  local b = Box('Cat', Vect(2,3))
+  local sz = b.size_
+  sz.x = 5
+  assertEqual(5, b.size_.x)
+end
+
+function should.notGcOwnerBeforePointer()
+  local b = Box('Cat', Vect(2,3))
+  local sz = b.size_
+  b = nil
+  collectgarbage()
+  -- b is not deleted yet because 'sz' points to b through
+  -- the userdata env.
+  sz.x = 4
+end
+
+-- Should not gc
+function should.notGCPointerToMember()
+  local b = Box('Cat', Vect(2,3))
+  local sz = b.size_
+  sz:__gc() -- does nothing
+  sz.x = 4
+  sz = nil
+  collectgarbage()
+  assertEqual(4, b.size_.x)
 end
 
 function should.writeBoxAttributes()

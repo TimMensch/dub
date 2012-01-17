@@ -26,7 +26,6 @@ setmetatable(lib, {
     self.functions_list = {}
     self.variables_list = {}
     self.constants_list = {}
-    self.headers_list   = self.headers_list or {}
     self.super_list     = {}
     self.dub            = self.dub or {}
     self.xml_headers    = self.xml_headers or {}
@@ -54,11 +53,6 @@ function lib:attributes()
   return self.db:variables(self)
 end
 
---- Return an iterator over the headers for this class/namespace.
-function lib:headers()
-  return self.db:headers(self)
-end
-
 --- Return an iterator over the superclasses of this class.
 function lib:superclasses()
   return self.db:superclasses(self)
@@ -70,7 +64,7 @@ function lib:constants()
 end
 
 function lib:fullname()
-  if self.parent and self.parent ~= self.db then
+  if self.parent and self.parent.name then
     return self.parent:fullname() .. '::' .. self.name
   else
     return self.name

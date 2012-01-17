@@ -65,29 +65,27 @@ function should.bindCompileAndLoad()
     -- Build Child.so
     --
     binder:build {
-      work_dir = lk.dir(),
-      output   = 'tmp/Child.so',
+      output   = 'test/tmp/Child.so',
       inputs   = {
-        'tmp/dub/dub.cpp',
-        'tmp/Child.cpp',
+        'test/tmp/dub/dub.cpp',
+        'test/tmp/Child.cpp',
       },
       includes = {
-        'tmp',
-        'fixtures/inherit',
+        'test/tmp',
+        'test/fixtures/inherit',
       },
     }
 
     -- Build Parent.so
     binder:build {
-      work_dir = lk.dir(),
-      output   = 'tmp/Parent.so',
+      output   = 'test/tmp/Parent.so',
       inputs   = {
-        'tmp/dub/dub.cpp',
-        'tmp/Parent.cpp',
+        'test/tmp/dub/dub.cpp',
+        'test/tmp/Parent.cpp',
       },
       includes = {
-        'tmp',
-        'fixtures/inherit',
+        'test/tmp',
+        'test/fixtures/inherit',
       },
     }
 
@@ -110,38 +108,39 @@ end
 --=============================================== Inheritance
 
 function should.createChildObject()
-  local c = Child('Romulus', false, -771, 1.23, 2.34)
+  local c = Child('Romulus', Parent.Depends, -771, 1.23, 2.34)
   assertType('userdata', c)
 end
 
 function should.readChildAttributes()
-  local c = Child('Romulus', false, -771, 1.23, 2.34)
+  local c = Child('Romulus', Parent.Single, -771, 1.23, 2.34)
   assertEqual(-771, c.birth_year)
-  assertFalse(c.married)
+  assertTrue(c.happy)
+  assertEqual(Child.Single)
   assertNil(c.asdfasd)
 end
 
 function should.writeChildAttributes()
-  local c = Child('Romulus', false, -771, 1.23, 2.34)
+  local c = Child('Romulus', Parent.Poly, -771, 1.23, 2.34)
   assertError("invalid key 'asdfasd'", function()
     c.asdfasd = 15
   end)
   c.birth_year = 2000
   assertEqual(2000, c.birth_year)
-  c.married = true
-  assertTrue(c.married)
+  c.status = Parent.Single
+  assertEqual(Parent.Single, c.status)
 end
 
 function should.executeSuperMethods()
-  local c = Child('Romulus', nil, -771, 1.23, 2.34)
+  local c = Child('Romulus', Parent.Poly, -771, 1.23, 2.34)
   assertEqual(2783, c:computeAge(2012))
 end
 
 --=============================================== Cast
 
 function should.castInCalls()
-  local c = Child('Romulus', true, -771, 1.23, 2.34)
-  local p = Parent('Rhea', nil, -800)
+  local c = Child('Romulus', Parent.Married, -771, 1.23, 2.34)
+  local p = Parent('Rhea', Parent.Single, -800)
   assertEqual('Romulus', Parent.getName(c))
   assertEqual('Rhea', Parent.getName(p))
 end
@@ -149,7 +148,7 @@ end
 --=============================================== Custom bindings
 
 function should.useCustomBindings()
-  local c = Child('Romulus', true, -771, 1.23, 2.34)
+  local c = Child('Romulus', Parent.Depends, -771, 1.23, 2.34)
   local x, y = c:position()
   assertEqual(1.23, x)
   assertEqual(2.34, y)

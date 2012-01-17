@@ -15,17 +15,22 @@ Currently, the parser supports:
  * public attributes read/write
  * public class methods
  * public static attributes read/write
+ * pointer to member (no dangling pointers)
  * natural casting from std::string to string type (can include '\0')
  * class instantiation from templates through typedefs
  * class alias through typedefs
  * bindings for superclass
  * automatic casting to base class
- * handling of default argument values
- * handling of overloaded functions
+ * default argument values
+ * overloaded functions
+ * operator overloading (even operator[], operator() and operator+= and such)
  * return value optimization (no copy)
  * simple type garbage collection optimization (no __gc method)
  * hand made bindings for special cases
  * class enums
+ * build system
+ * group multiple bindings in a single library
+ * rewrite class or library names
  * well tested
 
 = TODO
