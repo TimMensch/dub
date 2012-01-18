@@ -8,19 +8,30 @@ require 'lk/Dir'
 require 'lk/util'
 
 
-function dump(e,indent)
-  if not indent then
-    indent = 0
-  end
+function __dump(e,indent,map)
 
   if type(e) ~= 'table' then
-    print(tostring(e))
+    print('['..tostring(e)..']')
     return
   end
 
+	if map[e] then
+    print( string.rep(" ",indent) .."Reference to "..tostring(e))
+		return
+	end
+
+	map[e]=true
+
+	if indent > 70 then
+    io.write( string.rep(" ",indent) .. ">>too deep" )
+		return
+	end
+
+	print( string.rep(" ",indent) .. '['..tostring(e)..']')
+
   if e[0] then
     print("e[0]->")
-    dump(e[0],indent+2)
+    __dump(e[0],indent+2,map)
   end
 
   for k,v in pairs(e) do
@@ -28,12 +39,21 @@ function dump(e,indent)
     io.write(k .. "->");
     if type(v)=='table' then
       io.write("\n");
-      dump(v,indent+4)
+      __dump(v,indent+2,map)
     else
       io.write(tostring(v).."\n")
     end
 
   end
+end
+
+function dump(e,indent)
+	if not indent then
+		indent = 0
+	end
+
+	local map = {}
+	__dump(e,indent,map)
 end
 
 local exepath = arg[-1]
@@ -70,9 +90,24 @@ ttn['qc::string'] ={
 };
 
 ttn.qcReal = 'number'
+ttn.int8_t = 'number'
+ttn.uint8_t = 'number'
+ttn.int16_t = 'number'
+ttn.uint16_t = 'number'
+ttn.int32_t = 'number'
+ttn.uint32_t = 'number'
+
 
 binder:bind(ins, {output_directory = 'bindings_path',
-  --only = {'qcVec2'}
+  --[[only = {
+		'qcVec2',
+		'qc::Rect',
+		'qcObject',
+		'qcObjectManager',
+		'qcSortedObjectManager',
+		'qcGameObject',
+		'qcTransform',
+		}]]--
 })
 
 --dub.LuaBinder.COMPILER = 'c:/Devel/mingw/msys/1.0/bin/sh.exe -c "PATH=/bin:/mingw/bin env PATH=/c/Users/tim/bin:.:/usr/local/bin:/mingw/bin:/bin g++.exe '
