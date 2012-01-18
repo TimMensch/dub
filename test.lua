@@ -7,10 +7,43 @@ lk = {}
 require 'lk/Dir'
 require 'lk/util'
 
+
+function dump(e,indent)
+  if not indent then
+    indent = 0
+  end
+
+  if type(e) ~= 'table' then
+    print(tostring(e))
+    return
+  end
+
+  if e[0] then
+    print("e[0]->")
+    dump(e[0],indent+2)
+  end
+
+  for k,v in pairs(e) do
+    io.write( string.rep(" ",indent) )
+    io.write(k .. "->");
+    if type(v)=='table' then
+      io.write("\n");
+      dump(v,indent+4)
+    else
+      io.write(tostring(v).."\n")
+    end
+
+  end
+end
+
 local exepath = arg[-1]
 
 local ins = dub.Inspector()
-ins:parse('test/fixtures/simple/include')
+ins:parse{
+--	INPUT='../qc/include/qc',
+	INPUT='../qc/include/qc',
+	TEMPLATE_PATH = '../qc/bindings'
+}
 
 local binder = dub.LuaBinder()
 local ttn = dub.LuaBinder.TYPE_TO_NATIVE
@@ -39,7 +72,7 @@ ttn['qc::string'] ={
 ttn.qcReal = 'number'
 
 binder:bind(ins, {output_directory = 'bindings_path',
-  only = {'Simple'}
+  --only = {'qcVec2'}
 })
 
 --dub.LuaBinder.COMPILER = 'c:/Devel/mingw/msys/1.0/bin/sh.exe -c "PATH=/bin:/mingw/bin env PATH=/c/Users/tim/bin:.:/usr/local/bin:/mingw/bin:/bin g++.exe '
