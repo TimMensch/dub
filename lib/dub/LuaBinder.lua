@@ -1007,7 +1007,7 @@ function private:insertByArg(res, func, max_index, skip_index)
 
   -- Select best match
   local match
-  for _, d in ipairs(diff) do
+  for _, d in pairs(diff) do
     if not match then
       match = d
     elseif d.weight > match.weight then
