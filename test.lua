@@ -8,7 +8,13 @@ require 'lk/Dir'
 require 'lk/util'
 
 
-function __dump(e,indent,map)
+function __dump(e,indent,map,maxdepth)
+
+	if maxdepth==0 then
+		return
+	end
+
+	maxdepth = maxdepth -1
 
   if type(e) ~= 'table' then
     print('['..tostring(e)..']')
@@ -31,29 +37,32 @@ function __dump(e,indent,map)
 
   if e[0] then
     print("e[0]->")
-    __dump(e[0],indent+2,map)
+    __dump(e[0],indent+2,map,maxdepth)
   end
 
   for k,v in pairs(e) do
-    io.write( string.rep(" ",indent) )
-    io.write(k .. "->");
-    if type(v)=='table' then
-      io.write("\n");
-      __dump(v,indent+2,map)
-    else
-      io.write(tostring(v).."\n")
-    end
+		if k~='parent' then
 
+			io.write( string.rep(" ",indent) )
+			io.write(k .. "->");
+			if type(v)=='table' then
+				io.write("\n");
+				__dump(v,indent+2,map,maxdepth)
+			else
+				io.write(tostring(v).."\n")
+			end
+
+		end
   end
 end
 
-function dump(e,indent)
-	if not indent then
-		indent = 0
-	end
+function dump(e,maxdepth)
+
+	indent = indent or 0
+	maxdepth = maxdepth or -1
 
 	local map = {}
-	__dump(e,indent,map)
+	__dump(e,0,map,maxdepth)
 end
 
 local exepath = arg[-1]
