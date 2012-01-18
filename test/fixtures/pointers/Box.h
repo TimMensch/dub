@@ -9,13 +9,28 @@
  *   * casting script strings to std::string.
  *   * casting std::string to script strings.
  *   * accessing complex public members.
+ *   * custom public member accessors.
+ *   * pointer member types and gc.
+ *   * complex default values.
  */
 struct Box {
+
   std::string name_;
   Vect size_;
-  Box(const std::string &name, const Vect &size)
+  /** Pointer to other type.
+   */
+  Vect *position;
+
+  /** Const version (should return a copy)
+   */
+  const Vect *const_vect;
+
+  Box(const std::string &name, const Vect &size = Vect(0,0))
     : name_(name)
-    , size_(size) {}
+    , size_(size)
+    , position(NULL)
+    , const_vect(NULL)
+  {}
 
   static Box *MakeBox(const char *name, Vect *size) {
     Box *b = new Box(std::string(name), *size);

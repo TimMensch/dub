@@ -13,10 +13,10 @@ local should = test.Suite('dub.Inspector - pointers')
 local ins  = dub.Inspector {
   INPUT    = 'test/fixtures/pointers',
   doc_dir  = lk.dir() .. '/tmp',
-  keep_xml = true,
 }
 
 local Vect = ins:find('Vect')
+local Box  = ins:find('Box')
 
 --=============================================== TESTS
 
@@ -25,7 +25,6 @@ function should.findVectClass()
 end
 
 function should.parseParamTypes()
-  local Box = ins:find('Box')
   local ctor = Box:method('Box')
   local p1   = ctor.params_list[1]
   local p2   = ctor.params_list[2]
@@ -39,7 +38,6 @@ function should.parseParamTypes()
 end
 
 function should.parsePointerParamTypes()
-  local Box = ins:find('Box')
   local met = Box:method('MakeBox')
   local p1   = met.params_list[1]
   local p2   = met.params_list[2]
@@ -54,7 +52,34 @@ function should.parsePointerParamTypes()
   assertEqual('Vect *', p2.ctype.create_name)
 end
 
-function should.listAttributes()
+function should.listBoxAttributes()
+  local res = {}
+  for attr in Box:attributes() do
+    local name = attr.name
+    if attr.static then
+      name = name .. ':static'
+    end
+    table.insert(res, name)
+  end
+  assertValueEqual({
+    'name_',
+    'size_',
+    'position',
+    'const_vect',
+  }, res)
+end
+
+function should.markConstMembers()
+  local attr = Box:findChild('const_vect')
+  assertTrue(attr.ctype.const)
+end
+
+function should.markPointerMembers()
+  local attr = Box:findChild('position')
+  assertTrue(attr.ctype.ptr)
+end
+
+function should.listVectAttributes()
   local res = {}
   for attr in Vect:attributes() do
     local name = attr.name
@@ -145,6 +170,13 @@ end
 function should.haveGetMethod()
   local set  = Vect:method(Vect.GET_ATTR_NAME)
   assertTrue(set.is_get_attr)
+end
+
+function should.parseCompoundNameInDefault()
+  local Box = ins:find('Box')
+  local met = Box:method('Box')
+  local p = met.params_list[2]
+  assertEqual('Vect(0, 0)', p.default)
 end
 
 function should.parseAddOperator()

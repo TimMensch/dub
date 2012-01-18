@@ -588,6 +588,7 @@ end
 
 
 function parse.param(elem, position)
+
   -- some "functions" are really macros, and they don't
   -- end up with a declname. We're not wrapping those macros,
   -- so let's not crash.
@@ -596,23 +597,17 @@ function parse.param(elem, position)
   if not declname then
     return nil
   end
-
-  -- when a default is a compound, it needs the
-  -- compound name (def[1][1]) plus its construction
-  -- parameters (def[2])
-  local def = (elem:find('defval') or {})
-  if type(def[1])=='table' then
-    def = def[1][1]..def[2]
-  else
-    def = def[1]
+ 
+  local default = elem:find('defval')
+  if default then
+    default = private.flatten(default)
   end
-
   return {
     type     = 'dub.Param',
     name     = elem:find('declname')[1],
     position = position,
     ctype    = parse.type(elem),
-    default  = def,
+    default  = default,
   }
 end
 
@@ -818,10 +813,12 @@ function private.flatten(xml)
   else
     local res = ''
     for i, e in ipairs(xml) do
-      if i > 1 then
-        res = res .. ' '
+      local f = private.flatten(e)
+      if i > 1 and string.sub(f, 1, 1) ~= '(' then
+        res = res .. ' ' .. f
+      else
+        res = res .. f
       end
-      res = res .. private.flatten(e)
     end
     return res
   end
