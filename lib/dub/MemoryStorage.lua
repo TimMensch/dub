@@ -8,7 +8,7 @@
 --]]------------------------------------------------------
 
 local lib     = {
-  type = 'dub.MemoryStorage', 
+  type = 'dub.MemoryStorage',
 }
 local private = {}
 local parse   = {}
@@ -279,7 +279,7 @@ end
 function private:parseHeaders(name)
   local cache = self.cache
   if self.parsed_headers then
-    return cache[name] 
+    return cache[name]
   end
   local elem
   -- Look in all unparsed headers
@@ -296,7 +296,7 @@ end
 
 require 'lubyk'
 
---- Parse a header definition and return element 
+--- Parse a header definition and return element
 -- identified by 'name' if found.
 function parse:header(header, not_lazy)
   local data = xml.load(header.path):find('compounddef')
@@ -373,7 +373,7 @@ end
 
 function parse:sectiondef(elem, header)
   local kind = elem.kind
-  if kind == 'public-func' or 
+  if kind == 'public-func' or
      -- methods
      kind == 'enum' or
      -- global enum
@@ -490,10 +490,16 @@ function parse:typedef(elem, header)
   typ.ctype.create_name = typ.name .. ' '
   return typ
 end
-    
+
 parse['function'] = function(self, elem, header)
   local name = elem:find('name')[1]
   if name == '~' .. self.name and self.dub.destroy == 'free' then
+    return nil
+  end
+
+  local params_list = parse.params(elem, header)
+
+  if not params_list then
     return nil
   end
 
@@ -502,7 +508,7 @@ parse['function'] = function(self, elem, header)
     db            = self.db or self,
     parent        = self,
     name          = name,
-    params_list   = parse.params(elem, header),
+    params_list   = params_list,
     return_value  = parse.retval(elem),
     definition    = elem:find('definition')[1],
     argsstring    = elem:find('argsstring')[1],
@@ -566,9 +572,13 @@ function parse.params(elem, header)
     if p.xml == 'param' then
       i = i + 1
       local param = parse.param(p, i)
-      table.insert(res, param)
-      if param.default and not first_default then
-        first_default = param.position
+      if param then
+        table.insert(res, param)
+        if param.default and not first_default then
+          first_default = param.position
+        end
+      else
+        return nil
       end
     end
   end
@@ -576,13 +586,33 @@ function parse.params(elem, header)
   return res
 end
 
+
 function parse.param(elem, position)
+  -- some "functions" are really macros, and they don't
+  -- end up with a declname. We're not wrapping those macros,
+  -- so let's not crash.
+  local declname = elem:find('declname')
+
+  if not declname then
+    return nil
+  end
+
+  -- when a default is a compound, it needs the
+  -- compound name (def[1][1]) plus its construction
+  -- parameters (def[2])
+  local def = (elem:find('defval') or {})
+  if type(def[1])=='table' then
+    def = def[1][1]..def[2]
+  else
+    def = def[1]
+  end
+
   return {
     type     = 'dub.Param',
     name     = elem:find('declname')[1],
     position = position,
     ctype    = parse.type(elem),
-    default  = (elem:find('defval') or {})[1],
+    default  = def,
   }
 end
 
