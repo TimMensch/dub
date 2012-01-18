@@ -47,7 +47,11 @@ setmetatable(lib, {
       self.min_arg_size = #self.params_list
     end
     setmetatable(self, lib)
-    self:setName(self.name)
+
+    if not self:setName(self.name) then
+        return nil
+    end
+
     self.sign = private.makeSignature(self)
     return self
   end
@@ -92,11 +96,12 @@ function lib:setName(name)
     if op then
       self.cname = 'operator_' .. op
     else
-      print(name)
+      return false
     end
   else
     self.cname = self.name
   end
+  return true
 end
 --=============================================== PRIVATE
 

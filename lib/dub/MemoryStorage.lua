@@ -521,6 +521,10 @@ parse['function'] = function(self, elem, header)
     ctor          = self.is_class and name == self.name,
     dub           = parse.dub(elem) or {},
   }
+  if not child then
+    return nil
+  end
+
   if self.name == name then
     -- Constructor
     child.return_value = lib.makeType(name .. ' *')
@@ -597,7 +601,7 @@ function parse.param(elem, position)
   if not declname then
     return nil
   end
- 
+
   local default = elem:find('defval')
   if default then
     default = private.flatten(default)
