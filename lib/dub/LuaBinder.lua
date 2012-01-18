@@ -148,7 +148,7 @@ function lib:build(opts)
     flags = flags .. ' ' .. opts.flags
   end
   local cmd = 'cd ' .. work_dir .. ' && '
-  cmd = cmd .. self.COMPILER .. ' ' 
+  cmd = cmd .. self.COMPILER .. ' '
   cmd = cmd .. self.COMPILER_FLAGS[private.platform()] .. ' '
   cmd = cmd .. flags .. ' '
   cmd = cmd .. '-o ' .. opts.output .. ' '
@@ -600,7 +600,8 @@ function private:getParam(method, param, delta)
   end
   if param.default then
     local default = param.default
-    if rtype.scope then
+
+    if rtype and rtype.scope then
       default = rtype.scope .. '::' .. default
     end
     res = format('top__ >= %i ? (%s) : (%s)', param.position + delta, res, default)
@@ -655,7 +656,7 @@ function private:doCall(class, method)
   else
     res = self.SELF .. '->' .. res
   end
-  
+
   return res;
 end
 
@@ -870,9 +871,15 @@ end
 function private:bindElem(elem, options)
   if elem.type == 'dub.Class' then
     local path = self.output_directory .. lk.Dir.sep .. self:name(elem) .. '.cpp'
+    path = path:gsub("::","_")
+--    print("writing "..path)
     local file = io.open(path, 'w')
-    file:write(self:bindClass(elem))
-    file:close()
+    if file then
+      file:write(self:bindClass(elem))
+      file:close()
+    else
+      print("can't open "..path)
+    end
   end
 end
 
@@ -920,7 +927,7 @@ function private:insertByTop(res, func, index)
     need_top = private.insertByArg(self, list, func, index) or need_top
   else
     res[top_key] = func
-    res['.count'] = res['.count'] + 1
+    res['.count'] = (res['.count'] or 0)+ 1
     need_top = need_top or res['.count'] > 1
   end
   return need_top
