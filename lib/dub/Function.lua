@@ -47,11 +47,10 @@ setmetatable(lib, {
       self.min_arg_size = #self.params_list
     end
     setmetatable(self, lib)
-
     if not self:setName(self.name) then
-        return nil
+      -- invalid name (usually an unknown operator)
+      return nil
     end
-
     self.sign = private.makeSignature(self)
     return self
   end
