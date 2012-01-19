@@ -108,6 +108,7 @@ ttn.uint32_t = 'number'
 
 
 binder:bind(ins, {output_directory = 'bindings_path',
+	single_lib="qc"
   --[[only = {
 		'qcVec2',
 		'qc::Rect',
