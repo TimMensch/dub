@@ -46,6 +46,7 @@ local lib     = {
   -- Native Lua operators
   LUA_NATIVE_OP = {
     add   = true,
+    unm   = true,
     sub   = true,
     mul   = true,
     div   = true,
@@ -220,6 +221,7 @@ function lib:functionBody(class, method)
   -- Resolve C++ types to native lua types.
   self:resolveTypes(method)
   local custom
+
   if class.custom_bindings then
     custom = (class.custom_bindings[method.parent.name] or {})[method.name]
   end
@@ -703,7 +705,7 @@ function private:pushValue(method, value, return_value)
       end
     else
       -- Return value is a pointer
-      res = format('%s%sretval__ = %s;\n', 
+      res = format('%s%sretval__ = %s;\n',
         (ctype.const and 'const ') or '',
         rtype.create_name, value)
       if not method.ctor then
