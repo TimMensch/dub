@@ -106,9 +106,101 @@ ttn.uint16_t = 'number'
 ttn.int32_t = 'number'
 ttn.uint32_t = 'number'
 
+local destroyObjectRef=[[
+if (userdata->gc)
+{
+	// do I need two copies? I'm not sure if it's Kosher to let lua_rawset at the
+	// end pop one of the original parameters from the stack.
+
+	lua_pushvalue(L,-1); // ud ud
+	lua_pushvalue(L,-1); // ud ud ud
+
+	// look up userdata in registry to get smart pointer for this object
+	lua_rawget(L,LUA_REGISTRYINDEX); // ud ud smart_ud
+
+	OBJECT_TYPERef * s = (OBJECT_TYPERef*)lua_touserdata(L,-1);
+	lua_pop(L,1); // ud ud
+	lua_pushnil(L); // ud ud nil
+
+	// clear reference in registry
+	lua_rawset(L,LUA_REGISTRYINDEX);
+
+	delete s;
+}
+userdata->gc = false;
+]]
+
+local createObjectRef=[[
+
+OBJECT_TYPERef * ref = new OBJECT_TYPERef(qcGameObject::create());
+
+dub_pushudata(L, ref->get(), "OBJECT_TYPE", true);
+lua_pushvalue(L,-1); // dup userdata
+lua_pushlightuserdata(L,ref); // a light user data wrapper for the smart pointer
+lua_rawset(L,LUA_REGISTRYINDEX);
+return 1;
+]]
+
+--[[
+static int qcGameObject_create(lua_State *L) {
+  try {
+	dub_pushudata(L, new qcGameObjectRef(qcGameObject::create()), "qcGameObjectRef", true);
+	return 1;
+  } catch (std::exception &e) {
+	lua_pushfstring(L, "qc.qcGameObject.create: %s", e.what());
+  } catch (...) {
+	lua_pushfstring(L, "qc.qcGameObject.create: Unknown exception");
+  }
+  return lua_error(L);
+}
+--]]
+
+local function sharedObjectDef(types)
+
+	local b = {}
+
+	for _,v in ipairs( types ) do
+
+		b[v] =
+		{
+			['~'..v] = { body = destroyObjectRef:gsub("OBJECT_TYPE",v)},
+			create   = { body = createObjectRef:gsub("OBJECT_TYPE",v)},
+		}
+	end
+
+	return b;
+
+end
+
+local custom_bindings = sharedObjectDef{
+	'qcAnimation',
+	'qcAnimationPlayer',
+	'qcArc',
+	'qcAtlas',
+	'qcGameObject',
+	'qcGameObjectClone',
+	'qcCircleMask',
+	'qcDeferDraw',
+	'qcDrawable',
+	'qcDrawComponent',
+	'qcLayer',
+	'qcObject',
+	'qcObjectManager',
+	'qcParticleSystem',
+	'qcRectangle',
+	'qcScript',
+	'qcSortedObjectManager',
+	'qcSong',
+	'qcSound',
+	'qcStream',
+	'qcTexture',
+	'qcTextureLink'
+}
 
 binder:bind(ins, {output_directory = 'bindings_path',
-	single_lib="qc"
+	single_lib="qc",
+	custom_bindings = custom_bindings
+
   --[[only = {
 		'qcVec2',
 		'qc::Rect',
