@@ -56,7 +56,7 @@ function __dump(e,indent,map,maxdepth)
   end
 end
 
-function dump(e,maxdepth)
+function dumpvalue(e,maxdepth)
 
 	indent = indent or 0
 	maxdepth = maxdepth or -1
