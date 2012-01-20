@@ -130,10 +130,16 @@ struct DubRef {
   }
 };
 
-/** Push a custom type on the stack.
- * Since the value is passed as a pointer, we assume it has been created
- * using 'new' and Lua can safely call delete when it needs to garbage-
- * -collect it.
+/**
+ * Push a custom type on the stack.
+ *
+ * Since the value is passed as a pointer, the default is to assume it needs to
+ * garbage-collect it.
+ *
+ * @param L         Lua state.
+ * @param ptr       Pointer to object to pass to Lua.
+ * @param type_name Name of the type.
+ * @param gc        True to garbage collect object.
  */
 void dub_pushudata(lua_State *L, void *ptr, const char *type_name, bool gc = true);
 
@@ -169,7 +175,7 @@ void dub_pushclass(lua_State *L, const T &obj, const char *type_name) {
 
 /** Push a custom type on the stack and give it the pointer to the userdata.
  * Passing the userdata enables early deletion from C++ that safely
- * invalidates the userdatum by calling 
+ * invalidates the userdatum by calling
  */
 template<class T>
 void dub_pushclass2(lua_State *L, T *ptr, const char *type_name) {
@@ -244,5 +250,5 @@ void dub_register(lua_State *L, const char *libname, const char *class_name);
 // This version is slightly adapted to cope with different
 // hash sizes (and to be easy to write in Lua).
 int dub_hash(const char *str, int sz);
-  
+
 #endif // DUB_BINDING_GENERATOR_DUB_H_
