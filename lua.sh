@@ -11,4 +11,4 @@ fi
 
 P1=$1
 shift
-env LUA_PATH=bindings_path/\?.lua\;$THISPATH/lib/\?.lua LUA_CPATH=\;\;$QCPATH/host/this/clibs/?.dll\;$QCPATH/host/this/clibs/?.so $QCPATH/host/this/luajit $THISPATH/$P1 $*
+env LUA_PATH=bindings_path/\?.lua\;$THISPATH/lib/\?.lua\;$THISPATH/lib/lk/\?.lua LUA_CPATH=\;\;$QCPATH/host/this/clibs/?.dll\;$QCPATH/host/this/clibs/?.so $QCPATH/host/this/luajit $THISPATH/$P1 $*
