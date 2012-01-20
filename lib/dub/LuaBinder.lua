@@ -48,6 +48,7 @@ local lib     = {
     add   = true,
     unm   = true,
     sub   = true,
+    unm   = true,
     mul   = true,
     div   = true,
     eq    = true,
