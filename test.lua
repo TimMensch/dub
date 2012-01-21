@@ -78,6 +78,8 @@ local binder = dub.LuaBinder()
 local ttn = dub.LuaBinder.TYPE_TO_NATIVE
 local format = string.format
 
+local ignore = {}-- "qcAnimation" }
+
 ttn['qc::string'] ={
   type   = 'qc::string',
 
@@ -99,12 +101,6 @@ ttn['qc::string'] ={
 };
 
 ttn.qcReal = 'number'
-ttn.int8_t = 'number'
-ttn.uint8_t = 'number'
-ttn.int16_t = 'number'
-ttn.uint16_t = 'number'
-ttn.int32_t = 'number'
-ttn.uint32_t = 'number'
 
 local destroyObjectRef=[[
 if (userdata->gc)
@@ -199,6 +195,7 @@ local custom_bindings = sharedObjectDef{
 
 binder:bind(ins, {output_directory = 'bindings_path',
 	single_lib="qc",
+	ignore=ignore,
 	custom_bindings = custom_bindings
 
   --[[only = {
