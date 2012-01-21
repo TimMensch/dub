@@ -78,7 +78,11 @@ local binder = dub.LuaBinder()
 local ttn = dub.LuaBinder.TYPE_TO_NATIVE
 local format = string.format
 
-local ignore = { "qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
+local ignore = {
+-- classes that Lua doesn't need right now
+"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList",
+-- temporary ignores until the base class bug is fixed
+"qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
 
 ttn['qc::string'] ={
   type   = 'qc::string',
@@ -128,7 +132,7 @@ userdata->gc = false;
 
 local createObjectRef=[[
 
-OBJECT_TYPERef * ref = new OBJECT_TYPERef(qcGameObject::create());
+OBJECT_TYPERef * ref = new OBJECT_TYPERef(OBJECT_TYPE::create(CREATE_PARMS));
 
 dub_pushudata(L, ref->get(), "OBJECT_TYPE", true);
 lua_pushvalue(L,-1); // dup userdata
@@ -155,13 +159,17 @@ local function sharedObjectDef(types)
 
 	local b = {}
 
-	for _,v in ipairs( types ) do
+	for v,create_parms in pairs( types ) do
 
 		b[v] =
 		{
 			['~'..v] = { body = destroyObjectRef:gsub("OBJECT_TYPE",v)},
-			create   = { body = createObjectRef:gsub("OBJECT_TYPE",v)},
+			serialize = { body = "(void)self; (void)tab; return 0;" }
 		}
+
+		if create_parms then
+			b[v].create   = { body = createObjectRef:gsub("OBJECT_TYPE",v):gsub("CREATE_PARMS",create_parms)}
+		end
 
 		ignore[#ignore+1] = "enable_shared_from_this<" ..v..">"
 	end
@@ -171,31 +179,45 @@ local function sharedObjectDef(types)
 end
 
 local custom_bindings = sharedObjectDef{
-	'qcAnimation',
-	'qcAnimationPlayer',
-	'qcArc',
-	'qcAtlas',
-	'qcGameObject',
-	'qcGameObjectClone',
-	'qcCircleMask',
-	'qcDeferDraw',
-	'qcDrawable',
-	'qcDrawComponent',
-	'qcLayer',
-	'qcObject',
-	'qcObjectManager',
-	'qcParticleSystem',
-	'qcRectangle',
-	'qcScript',
-	'qcSortedObjectManager',
-	'qcSong',
-	'qcSound',
-	'qcStream',
-	'qcTexture',
-	'qcTextureLink'
+	qcAnimation="animation",
+	qcAnimationPlayer="animation",
+	qcArc="texture,segments,radius,start,stop,*color",
+	qcAtlas=false,
+	qcGameObject="",
+	qcGameObjectClone="target",
+	qcCircleMask="*size, *center, radius, *color, triangles",
+	qcCurve=false,
+	qcDeferDraw="animation",
+	qcDrawable="animation",
+	qcDrawComponent="animation",
+	qcLayer="animation",
+	qcObject="animation",
+	qcObjectManager="animation",
+	qcParticleSystem="animation",
+	qcRectangle="animation",
+	qcScript="animation",
+	qcSortedObjectManager="animation",
+	qcSong="animation",
+	qcSound="animation",
+	qcStream="animation",
+	qcTexture="animation",
+	qcTextureLink=false
 }
 
---custom_bindings.qcAnimation._cast_ = "foo";
+custom_bindings.qcCurve.setTexture={ body=[[
+self->setTexture(texture);
+]] }
+
+custom_bindings.qcAtlas.getFrameNames={ body=[[
+std::vector<const char*> frameNames = self->getFrameNames();
+lua_newtable(L);
+for (unsigned int i=0; i<frameNames.size(); ++i)
+{
+	lua_pushstring(L,frameNames[i]);
+	lua_rawseti(L,-2,i+1);
+}
+return 1;
+]] }
 
 binder:bind(ins, {output_directory = 'bindings_path',
 	single_lib="qc",
@@ -213,8 +235,31 @@ binder:bind(ins, {output_directory = 'bindings_path',
 		}]]--
 })
 
---dub.LuaBinder.COMPILER = 'c:/Devel/mingw/msys/1.0/bin/sh.exe -c "PATH=/bin:/mingw/bin env PATH=/c/Users/tim/bin:.:/usr/local/bin:/mingw/bin:/bin g++.exe '
---dub.LuaBinder.QUOTE = '"'
---binder:build('lib/Simple.so', 'bindings_path', '%.cpp', '-Itest/fixtures/simple/include -I/c/Devel/LuaJIT-2.0.0-beta5/src/ ../qc/tools/host/win/lua51.dll')
---require 'Simple'
- --local s = Simple(4.5)
+dub.LuaBinder.COMPILER = 'c:/Devel/mingw/msys/1.0/bin/sh.exe -c "PATH=/bin:/mingw/bin env PATH=/c/Users/tim/bin:.:/usr/local/bin:/mingw/bin:/bin g++.exe '
+dub.LuaBinder.QUOTE = '"'
+
+local files = {}
+
+local path = lk.Dir("bindings_path")
+for k in path:glob('.*') do
+	files[#files+1]=k
+end
+
+binder:build{
+	output='qc.dll',
+	inputs = files,
+	includes={
+		"test/fixtures/simple/include",
+		"../qc/include",
+		"../qc/external/bstrlib/2010_05_12/bstrlib",
+		"../qc/external/ustl/1.4",
+		"../qc/external/boost/1.46.1",
+		"lib",
+		"lib/dub/lua",
+		"/c/Devel/LuaJIT-2.0.0-beta5/src/"
+	},
+	flags='../qc/tools/host/win/lua51.dll'
+}
+
+--require 'qc'
+--local s = Simple(4.5)
