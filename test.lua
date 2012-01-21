@@ -78,7 +78,7 @@ local binder = dub.LuaBinder()
 local ttn = dub.LuaBinder.TYPE_TO_NATIVE
 local format = string.format
 
-local ignore = {}-- "qcAnimation" }
+local ignore = { "qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
 
 ttn['qc::string'] ={
   type   = 'qc::string',
@@ -162,6 +162,8 @@ local function sharedObjectDef(types)
 			['~'..v] = { body = destroyObjectRef:gsub("OBJECT_TYPE",v)},
 			create   = { body = createObjectRef:gsub("OBJECT_TYPE",v)},
 		}
+
+		ignore[#ignore+1] = "enable_shared_from_this<" ..v..">"
 	end
 
 	return b;
@@ -192,6 +194,8 @@ local custom_bindings = sharedObjectDef{
 	'qcTexture',
 	'qcTextureLink'
 }
+
+--custom_bindings.qcAnimation._cast_ = "foo";
 
 binder:bind(ins, {output_directory = 'bindings_path',
 	single_lib="qc",
