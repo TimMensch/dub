@@ -30,10 +30,13 @@ function lk.readall(basepath, path)
   else
     path = basepath
   end
-  local f = assert(io.open(path, 'rb'))
-  local s = f:read('*all')
-  f:close()
-  return s
+  local f = io.open(path, 'rb')
+  if (f) then
+      local s = f:read('*all')
+      f:close()
+      return s
+  end
+  return ""
 end
 
 function lk.absolutizePath(path, base)
