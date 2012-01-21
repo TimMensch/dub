@@ -41,7 +41,7 @@
 				Deletable="0"
 				SaveOption="SaveWorkspaceFiles"
 				RunFromDir="%rw">
-				<Exec CmdLine="make"/>
+				<Exec CmdLine='C:\Devel\cygwin\bin\bash -c "./lua.sh test.lua"'/>
 			</Target>
 			<Target
 				Name="Rebuild"
@@ -134,7 +134,7 @@
 				Deletable="0"
 				SaveOption="SaveWorkspaceFiles"
 				RunFromDir="%rw">
-				<Exec CmdLine="make"/>
+				<Exec CmdLine='C:\Devel\cygwin\bin\bash -c "./lua.sh test.lua"'/>
 			</Target>
 			<Target
 				Name="Rebuild"
