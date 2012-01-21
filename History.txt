@@ -1,4 +1,4 @@
-== 2.0
+== 2.0.0 2012-01-21
 * Complete rewrite in Lua
   * Most of the previous features are there (but not all).
   * Added support for attributes read/write.
@@ -11,6 +11,7 @@
   * Added 'Doxyfile' option on inspector to allow custom Doxyfile.
   * Added support for void *userdata to store Lua types.
   * Added support for transparent native table wrapping.
+  * Added support for abstract types and casting to these types.
   * ...
 
 == 1.1

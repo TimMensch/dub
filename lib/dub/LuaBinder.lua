@@ -23,9 +23,27 @@ local lib     = {
     float      = 'number',
     size_t     = 'number',
     int        = 'number',
-    ['signed int'] = 'number',
+    uint       = 'number',
+    uint8      = 'number',
+    uint16     = 'number',
+    uint32     = 'number',
+    int8_t     = 'number',
+    int16_t    = 'number',
+    int32_t    = 'number',
+    uint8_t    = 'number',
+    uint16_t   = 'number',
+    uint32_t   = 'number',
+    char       = 'number',
+    short      = 'number',
+    ['unsigned char']  = 'number',
+    ['signed int']     = 'number',
+    ['unsigned int']   = 'number',
+    ['signed short']   = 'number',
+    ['unsigned short'] = 'number',
+
     bool       = 'boolean',
-    ['char']   = 'string',
+
+    ['char *'] = 'string',
     ['std::string'] = {
       type   = 'std::string',
       -- Get value from Lua.
@@ -127,10 +145,19 @@ function lib:bind(inspector, options)
       end
     end
   else
+    local ignore = {}
+    if options.ignore then
+      for _, name in ipairs(options.ignore) do
+        ignore[name] = true
+      end
+    end
+    
     for elem in inspector:children() do
       if elem.type == 'dub.Class' then
-        table.insert(bound, elem)
-        private.bindElem(self, elem, options)
+        if not ignore[elem.name] then
+          table.insert(bound, elem)
+          private.bindElem(self, elem, options)
+        end
       end
     end
   end
@@ -473,7 +500,12 @@ end
 
 function lib:luaType(parent, ctype)
   local rtype  = parent.db:resolveType(parent, ctype.name) or ctype
-  local native = self.TYPE_TO_NATIVE[rtype.name]
+  local native
+  if ctype.ptr then
+    native = self.TYPE_TO_NATIVE[rtype.name..' *']
+  else
+    native = self.TYPE_TO_NATIVE[rtype.name] or self.TYPE_TO_NATIVE[rtype.name]
+  end
   if native then
     if type(native) == 'table' then
       native.rtype = native
@@ -744,7 +776,10 @@ function private:copyDubFiles()
     -- path to current file
     local dir = lk.dir()
     local dub_dir = dir .. '/lua/dub'
-    os.execute(format("cp -r '%s' '%s'", dub_dir, base_path))
+    for file in lfs.dir(dub_dir) do
+      local res = lk.readall(dub_dir .. '/' .. file)
+      lk.writeall(base_path .. '/dub/' .. file, res, true)
+    end
   end
 end
 
@@ -915,13 +950,7 @@ end
 function private:bindElem(elem, options)
   if elem.type == 'dub.Class' then
     local path = self.output_directory .. lk.Dir.sep .. self:openName(elem) .. '.cpp'
-    local file = io.open(path, 'w')
-    if file then
-      file:write(self:bindClass(elem))
-      file:close()
-    else
-      print("can't open "..path)
-    end
+    lk.writeall(path, self:bindClass(elem), true)
   end
 end
 
@@ -1095,7 +1124,5 @@ function private:makeLibFile(lib_name, list)
   }
 
   local path = self.output_directory .. lk.Dir.sep .. lib_name .. '.cpp'
-  local file = io.open(path, 'w')
-  file:write(res)
-  file:close()
+  lk.writeall(path, res, true)
 end
