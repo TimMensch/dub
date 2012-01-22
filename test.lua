@@ -172,6 +172,33 @@ local function sharedObjectDef(types)
 		end
 
 		ignore[#ignore+1] = "enable_shared_from_this<" ..v..">"
+
+		ttn[v.."Ref"]=
+		{
+			type   = v.."Ref",
+
+			-- Get value from Lua.
+			pull   =
+				function(name, position, prefix)
+					return format([[
+lua_pushvalue(L,%d); // ... ud
+lua_rawget(L,LUA_REGISTRYINDEX); // ... smart_ud
+%sRef * %s = (%sRef*)lua_touserdata(L,-1) ; // ... smart_ud
+lua_pop(L,1); // ... ]],position,v,name,v);
+				end,
+
+			-- Push value in Lua
+			push   =
+				function(name)
+					return format('lua_pushlstring(L, %s.data(), %s.length());', name, name)
+				end,
+
+			-- Cast value
+			cast   =
+				function(name)
+					return format('qc::string(%s, %s_sz_)', name, name)
+				end,
+		}
 	end
 
 	return b;
