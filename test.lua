@@ -190,7 +190,9 @@ lua_pop(L,1); // ... ]],position,v,name,v);
 			-- Push value in Lua
 			push   =
 				function(name)
-					return format('lua_pushlstring(L, %s.data(), %s.length());', name, name)
+					return format([[
+self->push(L);
+]], name, name)
 				end,
 
 			-- Cast value
@@ -288,7 +290,7 @@ for k in path:glob('.*') do
 	files[#files+1]=k
 end
 
---[[
+--[
 binder:build{
 	output='qc.dll',
 	inputs = files,
@@ -298,6 +300,9 @@ binder:build{
 		"../qc/external/bstrlib/2010_05_12/bstrlib",
 		"../qc/external/ustl/1.4",
 		"../qc/external/boost/1.46.1",
+		"../qc/external/sdl/1.2.14/sdl/include",
+		"../qc/external/tremor/1.0.2/Tremor",
+		"../qc/external/freetype/2.3.12/freetype/include",
 		"lib",
 		"lib/dub/lua",
 		"/c/Devel/LuaJIT-2.0.0-beta5/src/"
