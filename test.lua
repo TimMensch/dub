@@ -219,6 +219,23 @@ for (unsigned int i=0; i<frameNames.size(); ++i)
 return 1;
 ]] }
 
+custom_bindings.qcGameObject.m_scriptObject=
+{
+	get="self->m_scriptObject.push(L); return 1; /*m_scriptObject get*/",
+	set="lua_pushvalue(L,3); self->m_scriptObject = qcScriptObject(L); return 0; /*m_scriptObject set*/",
+}
+
+-- does nothing. :(
+custom_bindings.qcTextureRef=
+{
+	get="/*get a texture ref!*/",
+}
+
+custom_bindings.qcGameObject.addTexture=
+{
+	body='dub_pushudata(L, new qcDrawComponentRef(self->addTexture(texture)), "qcDrawComponentRef", true);'
+}
+
 binder:bind(ins, {output_directory = 'bindings_path',
 	single_lib="qc",
 	ignore=ignore,
@@ -245,6 +262,7 @@ for k in path:glob('.*') do
 	files[#files+1]=k
 end
 
+--[[
 binder:build{
 	output='qc.dll',
 	inputs = files,
@@ -263,3 +281,5 @@ binder:build{
 
 --require 'qc'
 --local s = Simple(4.5)
+
+--]]
