@@ -38,8 +38,9 @@ dub.Function  = lib
 setmetatable(lib, {
   __call = function(lib, self)
     self.dub = self.dub or {}
-    self.static = self.static or self.ctor
+    self.member = self.parent.is_class and not (self.static or self.ctor)
     self.has_defaults = self.params_list.first_default and true
+    self.header = self.header or self.parent.header
     if self.has_defaults then
       self.first_default = self.params_list.first_default
       -- minimal number of arguments
@@ -52,6 +53,11 @@ setmetatable(lib, {
       -- invalid name (usually an unknown operator)
       return nil
     end
+    
+    if self.db:ignored(self:fullname()) then
+      return nil
+    end
+
     self.sign = private.makeSignature(self)
     return self
   end
@@ -70,8 +76,20 @@ function lib:params()
   end
 end
 
-function lib:fullname()
+function lib:nameWithArgs()
   return self.definition .. self.argsstring
+end
+
+-- Full name for function.
+lib.fullname = dub.Class.fullname
+
+-- Full C name for function.
+function lib:fullcname()
+  if self.parent and self.parent.name then
+    return self.parent:fullname() .. '::' .. self.cname
+  else
+    return self.cname
+  end
 end
 
 function lib:neverThrows()
@@ -119,3 +137,4 @@ function private.makeSignature(met)
   end
   return res
 end
+
