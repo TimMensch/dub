@@ -80,7 +80,7 @@ local format = string.format
 
 local ignore = {
 -- classes that Lua doesn't need right now
-"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList",
+"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList", "qcDeferDraw",
 -- temporary ignores until the base class bug is fixed
 "qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
 
