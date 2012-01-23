@@ -74,6 +74,31 @@ local function_ignore =
 	"qcDrawable::update",
 	"qcDrawable::doDraw",
 	"qcObject::serialize",
+	"qcUnregisterSound",
+	"qcPlaySound",
+	"qcSoundRelease",
+	"qcStreamIsPlaying",
+	"qcStreamLoop",
+	"qcStreamRate",
+	"qcStreamStop",
+	"qcStreamPause",
+	"qcStreamVolume",
+	"qcGetFolder",
+	"qcDeleteFile",
+	"qcMakeDir",
+	"qcGetAssetSize",
+	"qcReadAssetVector",
+	"qcQueryNetworkState",
+	"qcBindThread",
+	"qcReleaseThread",
+	"qcPlaySong",
+	"qcCloseBufC",
+	"qcClose",
+	"qcDobCryptDecryptC",
+	"qcDobCryptVerifyC",
+	"qcRegisterSong",
+	"qcReadAssetC",
+	"qcFileExistsC"
 }
 
 local binder = dub.LuaBinder()
@@ -82,7 +107,7 @@ local binder = dub.LuaBinder()
 local ins = dub.Inspector()
 ins:parse{
 --	INPUT='../qc/include/qc',
-	INPUT='../qc/include/qc',
+	INPUT={'../qc/include/qc'},
 	TEMPLATE_PATH = '../qc/bindings',
 	ignore=function_ignore
 }
@@ -95,7 +120,7 @@ local ignore = {
 	"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList", "qcDeferDraw",
 	"qcParticleInitNullBase", "qcParticleUpdateBase", "qcParticleSystemImpl",
 	"qcCommitTextures", "qcOggStream", "qcFlashPlayer",
-	"qcDobCrypt", "qcFileInfo",
+	"qcDobCrypt", "qcFileInfo", "qcBuf",
 
 -- temporary ignores until the base class bug is fixed
 "qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
@@ -104,16 +129,23 @@ ttn['qcBuf'] ={
 	type='qcBuf',
 	pull =
 		function(name, position, prefix)
-			return format([[qcBuf & %s = *((qcBuf *)dub_checksdata(L, %d, "qcBuf"));]],name,position);
+			--return format([[qcBuf & %s = *((qcBuf *)dub_checksdata(L, %d, "qcBuf"));]],name,position);
+			return format([[assert(false); /*qcBuf*/]],name,position);
 		end,
 --		qcBuf buf = *((qcBuf *)dub_checksdata(L, 1, "qcBuf"));
 --		qcCloseBufC(*buf);
 
 	push = function(name) return format([[
-dub_pushudata(L, new qcBuf(%s), "qcBuf", true); // push
+qcBuf __retbuf = %s;
+if (__retbuf.buf)
+	lua_pushlstring(L,__retbuf.buf,__retbuf.length); // push qcBuf as string
+else
+	lua_pushstring(L,""); // empty buf; push empty string
+qcClose(__retbuf); // release out buf
 ]],name,name); end;
-	cast = function(name) return name; end;
+	cast = function(name) return name .. "/*qcBuf*/"; end;
 };
+
 ttn['qcFileRef'] ={
 	type='qcFileRef',
 	pull =
