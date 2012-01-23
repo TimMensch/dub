@@ -150,7 +150,7 @@ function lib:bind(inspector, options)
         ignore[name] = true
       end
     end
-    
+
     for elem in inspector:children() do
       if elem.type == 'dub.Class' then
         if not ignore[elem.name] then
@@ -779,7 +779,7 @@ function private:copyDubFiles()
   local dub_path = self.COPY_DUB_PATH
   if dub_path then
     local base_path = self.output_directory .. dub_path
-    platform.mkdir(base_path)
+    platform.mkdir(base_path..'/dub')
     -- path to current file
     local dir = lk.dir()
     local dub_dir = dir .. '/lua/dub'
