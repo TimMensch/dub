@@ -327,7 +327,7 @@ custom_bindings.qcMediaStore={}
 custom_bindings.qcMediaStore.getFilesInFolder={ body=[[
 qcFileListRef flr = self->getFilesInFolder(path,subdirs);
 lua_newtable(L);
-for (int i=0; i<flr->size(); ++i)
+for (int i=0; i<(int)flr->size(); ++i)
 {
 	lua_pushstring( L, (*flr)[i].path.c_str() );
 	lua_pushnumber( L, (*flr)[i].size );
@@ -339,7 +339,7 @@ return 1;
 custom_bindings.getFilesInFolder={ body=[[
 qcFileListRef flr = getFilesInFolder(path,subdirs);
 lua_newtable(L);
-for (int i=0; i<flr->size(); ++i)
+for (int i=0; i<(int)flr->size(); ++i)
 {
 	lua_pushstring( L, (*flr)[i].path.c_str() );
 	lua_pushnumber( L, (*flr)[i].size );
