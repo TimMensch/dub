@@ -118,7 +118,7 @@ function lib:bind(inspector, options)
   end
   self.extra_headers = {}
   private.parseExtraHeadersList(self, nil, options.extra_headers)
-  
+
 
   if options.single_lib then
     -- default is to prefix mt types with lib name
@@ -464,6 +464,7 @@ end
 -- extra header defined via 'extra_headers'.
 function lib:headers(elem)
   local headers
+  local seen = {}
   if elem then
     local fullname = elem:fullname()
     headers  = self.extra_headers[fullname] or {}
@@ -472,7 +473,10 @@ function lib:headers(elem)
   end
   local co = coroutine.create(function()
     for _, h in ipairs(headers) do
-      coroutine.yield(h)
+      if not seen[h] then
+        coroutine.yield(h)
+        seen[h]=true
+      end
     end
     if elem then
       coroutine.yield(elem.header)
@@ -481,7 +485,11 @@ function lib:headers(elem)
       for h in self.ins.db:headers(self.bound_classes) do
         -- Iterates over all bound_classes, global functions and
         -- constants.
-        coroutine.yield(h)
+        if not seen[h] then
+          coroutine.yield(h)
+          seen[h]=true
+        end
+
       end
     end
   end)
