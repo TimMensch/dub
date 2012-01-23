@@ -30,7 +30,11 @@
 
 #include <stdlib.h>  // malloc
 
-#define DUB_EXCEPTION_BUFFER_SIZE 256  
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
+
+#define DUB_EXCEPTION_BUFFER_SIZE 256
 #define TYPE_EXCEPTION_MSG "expected %s, found %s"
 #define TYPE_EXCEPTION_SMSG "expected %s, found %s (using super)"
 #define DUB_MAX_IN_SHIFT 4294967296
@@ -75,7 +79,7 @@ inline void push_own_env(lua_State *L, int ud) {
     // ... <udata> ... <env> <nil>
     // does not have it's own env table
     lua_pop(L, 2);
-    // ... <udata> ... 
+    // ... <udata> ...
     // Create env table
     lua_newtable(L);
     // ... <udata> ... <env>
@@ -96,7 +100,7 @@ inline void push_own_env(lua_State *L, int ud) {
     // has its own env table
     lua_pop(L, 1);
     // ... <udata> ... <env>
-  }                            
+  }
 }
 
 void dub_protect(lua_State *L, int owner, int original, const char *key) {
@@ -320,7 +324,7 @@ void dub_register(lua_State *L, const char *libname, const char *class_name) {
     fprintf(stderr, "Could load '%s' into '%s' ('%s' is not a table).\n", class_name, libname, tbl_err);
     return; // mt table not registered and not properly configured
   }
-      
+
   if (lua_isnil(L, -1)) {
     // no global table called libname
     lua_pop(L, 1);
