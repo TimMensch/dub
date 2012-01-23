@@ -18,28 +18,32 @@ local lib     = {
   -- By default does an strcmp to ensure correct attribute key.
   ASSERT_ATTR_KEY = true,
   LUA_STACK_SIZE_NAME = 'DubStackSize',
-  TYPE_TO_NATIVE = {
+  CHECK_TO_NATIVE = {
+    -- default is to use the same type (number = 'number')
+    int        = 'number',
+  },
+  TYPE_TO_CHECK = {
     double     = 'number',
     float      = 'number',
-    size_t     = 'number',
-    int        = 'number',
-    uint       = 'number',
-    uint8      = 'number',
-    uint16     = 'number',
-    uint32     = 'number',
-    int8_t     = 'number',
-    int16_t    = 'number',
-    int32_t    = 'number',
-    uint8_t    = 'number',
-    uint16_t   = 'number',
-    uint32_t   = 'number',
-    char       = 'number',
-    short      = 'number',
-    ['unsigned char']  = 'number',
-    ['signed int']     = 'number',
-    ['unsigned int']   = 'number',
-    ['signed short']   = 'number',
-    ['unsigned short'] = 'number',
+    size_t     = 'int',
+    int        = 'int',
+    uint       = 'int',
+    uint8      = 'int',
+    uint16     = 'int',
+    uint32     = 'int',
+    int8_t     = 'int',
+    int16_t    = 'int',
+    int32_t    = 'int',
+    uint8_t    = 'int',
+    uint16_t   = 'int',
+    uint32_t   = 'int',
+    char       = 'int',
+    short      = 'int',
+    ['unsigned char']  = 'int',
+    ['signed int']     = 'int',
+    ['unsigned int']   = 'int',
+    ['signed short']   = 'int',
+    ['unsigned short'] = 'int',
 
     bool       = 'boolean',
 
@@ -96,7 +100,10 @@ dub.LuaBinder = lib
 --=============================================== dub.LuaBinder()
 setmetatable(lib, {
   __call = function(lib, options)
-    local self = {options = options or {}}
+    local self = {
+      options       = options or {},
+      extra_headers = {},
+    }
     self.header_base = lfs.currentdir()
     return setmetatable(self, lib)
   end
@@ -109,6 +116,9 @@ function lib:bind(inspector, options)
   if options.header_base then
     self.header_base = lk.absolutizePath(options.header_base)
   end
+  self.extra_headers = {}
+  private.parseExtraHeadersList(self, nil, options.extra_headers)
+  
 
   if options.single_lib then
     -- default is to prefix mt types with lib name
@@ -140,7 +150,7 @@ function lib:bind(inspector, options)
         table.insert(bound, elem)
         private.bindElem(self, elem, options)
       else
-        print(string.format("Element '%s' not found.", name))
+        print(string.format("Could not bind '%s' (not found).", name))
       end
     end
   else
@@ -450,12 +460,45 @@ function lib:bindName(method)
   end
 end
 
+-- Return an iterator over the header of the element plus any
+-- extra header defined via 'extra_headers'.
+function lib:headers(elem)
+  local headers
+  if elem then
+    local fullname = elem:fullname()
+    headers  = self.extra_headers[fullname] or {}
+  else
+    headers = self.extra_headers['::'] or {}
+  end
+  local co = coroutine.create(function()
+    for _, h in ipairs(headers) do
+      coroutine.yield(h)
+    end
+    if elem then
+      coroutine.yield(elem.header)
+    else
+      -- No element, binding library
+      for h in self.ins.db:headers(self.bound_classes) do
+        -- Iterates over all bound_classes, global functions and
+        -- constants.
+        coroutine.yield(h)
+      end
+    end
+  end)
+  return function()
+    local ok, elem = coroutine.resume(co)
+    if ok then
+      return elem
+    end
+  end
+end
+--=============================================== Methods that can be customized
+
 -- Output the header for a class by removing the current path
 -- or 'header_base',
 function lib:header(header)
   return string.gsub(header, self.header_base .. '/', '')
 end
---=============================================== Methods that can be customized
 
 function lib:customTypeAccessor(method)
   if method:neverThrows() then
@@ -505,19 +548,20 @@ end
 
 function lib:luaType(parent, ctype)
   local rtype  = parent.db:resolveType(parent, ctype.name) or ctype
-  local native
+  local check
   if ctype.ptr then
-    native = self.TYPE_TO_NATIVE[rtype.name..' *']
+    check = self.TYPE_TO_CHECK[rtype.name..' *']
   else
-    native = self.TYPE_TO_NATIVE[rtype.name] or self.TYPE_TO_NATIVE[rtype.name]
+    check = self.TYPE_TO_CHECK[rtype.name] or self.TYPE_TO_CHECK[rtype.name]
   end
-  if native then
-    if type(native) == 'table' then
-      native.rtype = native
-      return native
+  if check then
+    if type(check) == 'table' then
+      check.rtype = check
+      return check
     else
       return {
-        type  = native,
+        type  = self.CHECK_TO_NATIVE[check] or check,
+        check = check,
         -- Resolved type
         rtype = rtype,
       }
@@ -628,9 +672,9 @@ function private:getParam(method, param, delta)
       -- special accessor
       res = lua.pull(param.name, param.position + delta, prefix)
     elseif rtype.cast then
-      res = format('(%s)%scheck%s(L, %i)', rtype.cast, prefix, lua.type, param.position + delta)
+      res = format('(%s)%scheck%s(L, %i)', rtype.cast, prefix, lua.check, param.position + delta)
     else
-      res = format('%scheck%s(L, %i)', prefix, lua.type, param.position + delta)
+      res = format('%scheck%s(L, %i)', prefix, lua.check, param.position + delta)
     end
   end
   return res
@@ -1122,6 +1166,7 @@ function private:makeLibFile(lib_name, list)
     local dir = lk.dir()
     self.lib_template = dub.Template {path = dir .. '/lua/lib.cpp'}
   end
+  self.bound_classes = list
   local res = self.lib_template:run {
     lib      = self.ins.db,
     lib_name = lib_name,
@@ -1131,4 +1176,25 @@ function private:makeLibFile(lib_name, list)
 
   local path = self.output_directory .. lk.Dir.sep .. lib_name .. '.cpp'
   lk.writeall(path, res, true)
+end
+
+function private:parseExtraHeadersList(base, list)
+  if not list then
+    return
+  end
+  for k, elem in pairs(list) do
+    if type(k) == 'number' then
+      local extra_list = self.extra_headers[base or '::']
+      if not extra_list then
+        extra_list = {}
+        self.extra_headers[base or '::'] = extra_list
+      end
+      table.insert(extra_list, elem)
+    elseif base then
+      -- sub type
+      private.parseExtraHeadersList(self, base..'::'..k, elem)
+    else
+      private.parseExtraHeadersList(self, k, elem)
+    end
+  end
 end
