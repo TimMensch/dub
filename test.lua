@@ -92,6 +92,7 @@ local format = string.format
 local ignore = {
 -- classes that Lua doesn't need right now
 	"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList", "qcDeferDraw",
+	"qcParticleInitNullBase", "qcParticleUpdateBase", "qcParticleSystemImpl",
 	"qcCommitTextures", "qcOggStream", "qcFlashPlayer",
 
 -- temporary ignores until the base class bug is fixed
@@ -300,17 +301,8 @@ local output_directory = '../qc/bindings/src'
 binder:bind(ins, {output_directory = output_directory,
 	single_lib="qc",
 	ignore=ignore,
-	custom_bindings = custom_bindings
-
-  --[[only = {
-		'qcVec2',
-		'qc::Rect',
-		'qcObject',
-		'qcObjectManager',
-		'qcSortedObjectManager',
-		'qcGameObject',
-		'qcTransform',
-		}]]--
+	custom_bindings = custom_bindings,
+--	only = { "qcRect32" }
 })
 --]==]
 
