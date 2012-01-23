@@ -782,13 +782,13 @@ end
 
 function parse.param(elem, position)
 
-  -- some "functions" are really macros, and they don't
-  -- end up with a declname. We're not wrapping those macros,
-  -- so let's not crash.
   local declname = elem:find('declname')
 
   if not declname then
-    return nil
+    -- unnamed parameter
+  	declname = string.format("p%d",position);
+  else
+    declname = declname[1]
   end
 
   local default = elem:find('defval')
@@ -797,7 +797,7 @@ function parse.param(elem, position)
   end
   return {
     type     = 'dub.Param',
-    name     = elem:find('declname')[1],
+    name     = declname,
     position = position,
     ctype    = parse.type(elem),
     default  = default,
