@@ -41,7 +41,6 @@ function dub.minHash(list_or_obj, func, accessor)
       table.insert(list, elem)
     end
   end
-  
   local list_sz = #list
   if list_sz == 0 then
     -- This is an error.

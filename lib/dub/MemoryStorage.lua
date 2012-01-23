@@ -615,7 +615,6 @@ function parse:enum(elem, header)
     enum.ctype.cast = name
     enum.ctype.create_name = name .. ' '
   end
-  enum.ctype.extra_cast = "(int)"
 
   self.has_constants = true
   return enum
@@ -656,6 +655,7 @@ parse['function'] = function(self, elem, header)
   local argsstring = elem:find('argsstring')[1]
   if string.match(argsstring, '%.%.%.') or string.match(argsstring, '%[') then
     -- cannot deal with vararg or array types
+    return nil
   end
 
   local child = dub.Function {
@@ -778,7 +778,6 @@ function parse.params(elem, header)
   res.first_default = first_default
   return res
 end
-
 
 function parse.param(elem, position)
 
