@@ -95,6 +95,7 @@ local ignore = {
 	"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList", "qcDeferDraw",
 	"qcParticleInitNullBase", "qcParticleUpdateBase", "qcParticleSystemImpl",
 	"qcCommitTextures", "qcOggStream", "qcFlashPlayer",
+	"qcDobCrypt", "qcFileInfo",
 
 -- temporary ignores until the base class bug is fixed
 "qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
@@ -110,6 +111,18 @@ ttn['qcBuf'] ={
 
 	push = function(name) return format([[
 dub_pushudata(L, new qcBuf(%s), "qcBuf", true); // push
+]],name,name); end;
+	cast = function(name) return name; end;
+};
+ttn['qcFileRef'] ={
+	type='qcFileRef',
+	pull =
+		function(name, position, prefix)
+			return format([[qcFileRef & %s = *((qcBuf *)dub_checksdata(L, %d, "qcFileRef"));]],name,position);
+		end,
+
+	push = function(name) return format([[
+dub_pushudata(L, new qcFileRef(%s), "qcFileRef", true); // push
 ]],name,name); end;
 	cast = function(name) return name; end;
 };
@@ -275,6 +288,32 @@ for (unsigned int i=0; i<frameNames.size(); ++i)
 	lua_pushstring(L,frameNames[i]);
 	lua_rawseti(L,-2,i+1);
 }
+return 1;
+]] }
+
+custom_bindings.qcMediaStore={}
+custom_bindings.qcMediaStore.getFilesInFolder={ body=[[
+qcFileListRef flr = self->getFilesInFolder(path,subdirs);
+lua_newtable(L);
+for (int i=0; i<flr->size(); ++i)
+{
+	lua_pushstring( L, (*flr)[i].path.c_str() );
+	lua_pushnumber( L, (*flr)[i].size );
+	lua_settable( L, -3 );
+}
+
+return 1;
+]] }
+custom_bindings.getFilesInFolder={ body=[[
+qcFileListRef flr = getFilesInFolder(path,subdirs);
+lua_newtable(L);
+for (int i=0; i<flr->size(); ++i)
+{
+	lua_pushstring( L, (*flr)[i].path.c_str() );
+	lua_pushnumber( L, (*flr)[i].size );
+	lua_settable( L, -3 );
+}
+
 return 1;
 ]] }
 
