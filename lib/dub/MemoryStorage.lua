@@ -652,20 +652,13 @@ parse['function'] = function(self, elem, header)
     return nil
   end
 
-  local params_list = parse.params(elem, header)
-
-  if not params_list then
-  	print("nil params_list");
-    return nil
-  end
-
   local child = dub.Function {
     -- self can be a class or db (root)
     db            = self.db or self,
     parent        = self,
     header        = header.file,
     name          = name,
-    params_list   = params_list,
+    params_list   = parse.params(elem, header),
     return_value  = parse.retval(elem),
     definition    = elem:find('definition')[1],
     argsstring    = argsstring,
