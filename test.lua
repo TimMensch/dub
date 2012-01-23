@@ -76,7 +76,7 @@ local function_ignore =
 }
 
 local binder = dub.LuaBinder()
---[==[
+
 
 local ins = dub.Inspector()
 ins:parse{
@@ -111,6 +111,19 @@ dub_pushudata(L, new qcBuf(%s), "qcBuf", true); // push
 ]],name,name); end;
 	cast = function(name) return name; end;
 };
+
+-- doesn't work!! grr...
+ttn['lua_State']={
+	type="lua_State",
+	pull=
+		function(name, position, prefix)
+			if name == 'L' then
+				return "/* L is already the lua_State */";
+			else
+				return format([[lua_State * %s = L;]],name);
+			end
+		end,
+}
 
 ttn['qc::string'] ={
   type   = 'qc::string',
@@ -282,9 +295,8 @@ custom_bindings.qcGameObjectClone.bind=
 	body='return self->bind(L);'
 }
 
-qcGameObject_bind
-
-binder:bind(ins, {output_directory = 'bindings_path',
+local output_directory = 'bindings_path'
+binder:bind(ins, {output_directory = output_directory,
 	single_lib="qc",
 	ignore=ignore,
 	custom_bindings = custom_bindings
@@ -301,6 +313,13 @@ binder:bind(ins, {output_directory = 'bindings_path',
 })
 --]==]
 
+-- hack to fix qcRect32
+local rect32 = lk.readall(output_directory,"qc_qcRect32.cpp")
+rect32 = rect32:gsub("(%W)T(%W)","%1int32_t%2")
+rect32 = rect32:gsub([[%*%*%(%(int32_t %*%)dub_checksdata_n%(L, 3, "int32_t"%)%);]],"(int32_t)lua_tonumber(L,3);")
+lk.writeall(output_directory.."/qc_qcRect32.cpp",rect32,false)
+
+--[[
 dub.LuaBinder.COMPILER = 'c:/Devel/mingw/msys/1.0/bin/sh.exe -c "PATH=/bin:/mingw/bin env PATH=/c/Users/tim/bin:.:/usr/local/bin:/mingw/bin:/bin g++.exe '
 dub.LuaBinder.QUOTE = '"'
 
@@ -311,7 +330,6 @@ for k in path:glob('.*') do
 	files[#files+1]=k
 end
 
---[
 binder:build{
 	output='qc.dll',
 	inputs = files,
