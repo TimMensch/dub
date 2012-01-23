@@ -628,7 +628,8 @@ function private:getParam(method, param, delta)
       -- special accessor
       res = lua.pull(param.name, param.position + delta, prefix)
     elseif rtype.cast then
-      res = format('(%s)%scheck%s(L, %i)', rtype.cast, prefix, lua.type, param.position + delta)
+      local extra_cast = rtype.extra_cast or ""
+      res = format('(%s)%s%scheck%s(L, %i)', rtype.cast, extra_cast, prefix, lua.type, param.position + delta)
     else
       res = format('%scheck%s(L, %i)', prefix, lua.type, param.position + delta)
     end

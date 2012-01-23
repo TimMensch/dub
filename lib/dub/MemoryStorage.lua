@@ -486,7 +486,7 @@ function parse:innerclass(elem, header, not_lazy)
   if not_lazy then
     private.parseAll(class)
   end
-  
+
   -- Create --get--, --set-- and ~Destructor if needed.
   private.makeSpecialMethods(class)
 end
@@ -615,6 +615,7 @@ function parse:enum(elem, header)
     enum.ctype.cast = name
     enum.ctype.create_name = name .. ' '
   end
+  enum.ctype.extra_cast = "(int)"
 
   self.has_constants = true
   return enum
@@ -623,7 +624,7 @@ end
 function parse:typedef(elem, header)
   local typ = {
     type        = 'dub.Typedef',
-    parent      = self, 
+    parent      = self,
     db          = self.db or self,
     name        = elem:find('name')[1],
     ctype       = parse.type(elem),
@@ -1038,7 +1039,7 @@ function parse.dub(elem)
 end
 
 -- function lib:find(scope, name)
---   return self:findByFullname(name) or 
+--   return self:findByFullname(name) or
 --   self:findByFullname(elem.parent:fullname() .. '::' .. name)
 -- end
 
