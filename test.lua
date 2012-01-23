@@ -71,8 +71,9 @@ local function_ignore =
 {
 	-- functions that need to be blocked
 	"qcDrawable::select",
+	"qcDrawable::update",
 	"qcDrawable::doDraw",
-	"qcObject::serialize"
+	"qcObject::serialize",
 }
 
 local binder = dub.LuaBinder()
