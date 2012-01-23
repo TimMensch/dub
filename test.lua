@@ -67,44 +67,73 @@ end
 
 local exepath = arg[-1]
 
+local function_ignore =
+{
+	-- functions that need to be blocked
+	"qcDrawable::select",
+	"qcDrawable::doDraw",
+	"qcObject::serialize"
+}
+
+local binder = dub.LuaBinder()
+--[==[
+
 local ins = dub.Inspector()
 ins:parse{
 --	INPUT='../qc/include/qc',
 	INPUT='../qc/include/qc',
-	TEMPLATE_PATH = '../qc/bindings'
+	TEMPLATE_PATH = '../qc/bindings',
+	ignore=function_ignore
 }
 
-local binder = dub.LuaBinder()
 local ttn = dub.LuaBinder.TYPE_TO_NATIVE
 local format = string.format
 
 local ignore = {
 -- classes that Lua doesn't need right now
-"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList", "qcDeferDraw",
+	"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList", "qcDeferDraw",
+	"qcCommitTextures", "qcOggStream",
+
 -- temporary ignores until the base class bug is fixed
 "qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
+
+ttn['qcBuf'] ={
+	type='qcBuf',
+	pull =
+		function(name, position, prefix)
+			return format([[qcBuf & %s = *((qcBuf *)dub_checksdata(L, %d, "qcBuf"));]],name,position);
+		end,
+--		qcBuf buf = *((qcBuf *)dub_checksdata(L, 1, "qcBuf"));
+--		qcCloseBufC(*buf);
+
+	push = function(name) return format([[
+dub_pushudata(L, new qcBuf(%s), "qcBuf", true); // push
+]],name,name); end;
+	cast = function(name) return name; end;
+};
 
 ttn['qc::string'] ={
   type   = 'qc::string',
 
   -- Get value from Lua.
   pull   = function(name, position, prefix)
-  return format('size_t %s_sz_;\nconst char *%s = %schecklstring(L, %i, &%s_sz_);',
+  return format('size_t %s_sz_;\nconst char *%s = %schecklstring(L, %i, &%s_sz_);//qc::string pull',
                 name, name, prefix, position, name)
   end,
 
   -- Push value in Lua
   push   = function(name)
-    return format('lua_pushlstring(L, %s.data(), %s.length());', name, name)
+    return format('lua_pushlstring(L, %s.c_str(), %s.length());//qc::string push', name, name)
   end,
 
   -- Cast value
   cast   = function(name)
-    return format('qc::string(%s, %s_sz_)', name, name)
+    return format('qc::string(%s, %s_sz_)/*cast*/', name, name)
   end,
 };
 
 ttn.qcReal = 'number'
+ttn.lua_Number = 'number'
 
 local destroyObjectRef=[[
 if (userdata->gc)
@@ -141,20 +170,6 @@ lua_rawset(L,LUA_REGISTRYINDEX);
 return 1;
 ]]
 
---[[
-static int qcGameObject_create(lua_State *L) {
-  try {
-	dub_pushudata(L, new qcGameObjectRef(qcGameObject::create()), "qcGameObjectRef", true);
-	return 1;
-  } catch (std::exception &e) {
-	lua_pushfstring(L, "qc.qcGameObject.create: %s", e.what());
-  } catch (...) {
-	lua_pushfstring(L, "qc.qcGameObject.create: Unknown exception");
-  }
-  return lua_error(L);
-}
---]]
-
 local function sharedObjectDef(types)
 
 	local b = {}
@@ -183,7 +198,7 @@ local function sharedObjectDef(types)
 					return format([[
 lua_pushvalue(L,%d); // ... ud
 lua_rawget(L,LUA_REGISTRYINDEX); // ... smart_ud
-%sRef * %s = (%sRef*)lua_touserdata(L,-1) ; // ... smart_ud
+%sRef &%s= *((%sRef*)lua_touserdata(L,-1)) ; // ... smart_ud
 lua_pop(L,1); // ... ]],position,v,name,v);
 				end,
 
@@ -191,14 +206,14 @@ lua_pop(L,1); // ... ]],position,v,name,v);
 			push   =
 				function(name)
 					return format([[
-self->push(L);
+%s->push(L); //
 ]], name, name)
 				end,
 
 			-- Cast value
 			cast   =
 				function(name)
-					return format('qc::string(%s, %s_sz_)', name, name)
+					return format('%s', name)
 				end,
 		}
 	end
@@ -210,14 +225,14 @@ end
 local custom_bindings = sharedObjectDef{
 	qcAnimation="animation",
 	qcAnimationPlayer="animation",
-	qcArc="*texture,segments,radius,start,stop,*color",
+	qcArc="texture,segments,radius,start,stop,*color",
 	qcAtlas=false,
-	qcGameObject="",
-	qcGameObjectClone="target",
 	qcCircleMask="*size, *center, radius, *color, triangles",
 	qcCurve=false,
 	qcDrawable=false,
 	qcDrawComponent="d",
+	qcGameObject="",
+	qcGameObjectClone="target",
 	qcLayer="",
 	qcObject=false,
 	qcObjectManager=false,
@@ -253,16 +268,21 @@ custom_bindings.qcGameObject.m_scriptObject=
 	set="lua_pushvalue(L,3); self->m_scriptObject = qcScriptObject(L); return 0; /*m_scriptObject set*/",
 }
 
--- does nothing. :(
-custom_bindings.qcTextureRef=
-{
-	get="/*get a texture ref!*/",
-}
-
 custom_bindings.qcGameObject.addTexture=
 {
 	body='dub_pushudata(L, new qcDrawComponentRef(self->addTexture(texture)), "qcDrawComponentRef", true);'
 }
+
+custom_bindings.qcGameObject.bind=
+{
+	body='return self->bind(L);'
+}
+custom_bindings.qcGameObjectClone.bind=
+{
+	body='return self->bind(L);'
+}
+
+qcGameObject_bind
 
 binder:bind(ins, {output_directory = 'bindings_path',
 	single_lib="qc",
@@ -279,6 +299,7 @@ binder:bind(ins, {output_directory = 'bindings_path',
 		'qcTransform',
 		}]]--
 })
+--]==]
 
 dub.LuaBinder.COMPILER = 'c:/Devel/mingw/msys/1.0/bin/sh.exe -c "PATH=/bin:/mingw/bin env PATH=/c/Users/tim/bin:.:/usr/local/bin:/mingw/bin:/bin g++.exe '
 dub.LuaBinder.QUOTE = '"'
