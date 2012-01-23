@@ -646,15 +646,16 @@ parse['function'] = function(self, elem, header)
   end
 
 
-  local params_list = parse.params(elem, header)
-
-  if not params_list then
-    return nil
-  end
-
   local argsstring = elem:find('argsstring')[1]
   if string.match(argsstring, '%.%.%.') or string.match(argsstring, '%[') then
     -- cannot deal with vararg or array types
+    return nil
+  end
+
+  local params_list = parse.params(elem, header)
+
+  if not params_list then
+  	print("nil params_list");
     return nil
   end
 
