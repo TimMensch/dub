@@ -92,7 +92,7 @@ local format = string.format
 local ignore = {
 -- classes that Lua doesn't need right now
 	"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList", "qcDeferDraw",
-	"qcCommitTextures", "qcOggStream",
+	"qcCommitTextures", "qcOggStream", "qcFlashPlayer",
 
 -- temporary ignores until the base class bug is fixed
 "qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
@@ -135,9 +135,10 @@ ttn['qc::string'] ={
   end,
 
   -- Push value in Lua
-  push   = function(name)
-    return format('lua_pushlstring(L, %s.c_str(), %s.length());//qc::string push', name, name)
-  end,
+  push   =
+	  function(name)
+		return format('lua_pushlstring(L, %s.c_str(), %s.length());//qc::string push', name, name)
+	  end,
 
   -- Cast value
   cast   = function(name)
@@ -295,7 +296,7 @@ custom_bindings.qcGameObjectClone.bind=
 	body='return self->bind(L);'
 }
 
-local output_directory = 'bindings_path'
+local output_directory = '../qc/bindings/src'
 binder:bind(ins, {output_directory = output_directory,
 	single_lib="qc",
 	ignore=ignore,
