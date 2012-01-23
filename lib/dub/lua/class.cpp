@@ -68,7 +68,7 @@ static const struct dub_const_Reg {{class.name}}_const[] = {
 {% for const in class:constants() do %}
   { {{string.format('%-15s, %-20s', '"'.. const ..'"', class.name..'::'..const)}} },
 {% end %}
-  { NULL, NULL},
+  { NULL, 0.0},
 };
 {% end %}
 
