@@ -31,6 +31,15 @@
 
 #include <string.h>  // strcmp etc.
 
+#include "qc/drawable.h"
+#include "qc/texture.h"
+#include "qc/texturelink.h"
+
+#include "qc/song.h"
+#include "qc/sound.h"
+#include "qc/animation.h"
+#include "qc/atlas.h"
+
 #ifndef DUB_ASSERT_KEY
 #define DUB_ASSERT_KEY(k, m) strcmp(k, m)
 // Use this to avoid the overhead of strcmp in get/set of public attributes.
