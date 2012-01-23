@@ -86,7 +86,7 @@ ins:parse{
 	ignore=function_ignore
 }
 
-local ttn = dub.LuaBinder.TYPE_TO_NATIVE
+local ttn = dub.LuaBinder.TYPE_TO_CHECK
 local format = string.format
 
 local ignore = {
