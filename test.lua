@@ -315,10 +315,10 @@ binder:bind(ins, {output_directory = output_directory,
 --]==]
 
 -- hack to fix qcRect32
-local rect32 = lk.readall(output_directory,"qc_qcRect32.cpp")
-rect32 = rect32:gsub("(%W)T(%W)","%1int32_t%2")
-rect32 = rect32:gsub([[%*%*%(%(int32_t %*%)dub_checksdata_n%(L, 3, "int32_t"%)%);]],"(int32_t)lua_tonumber(L,3);")
-lk.writeall(output_directory.."/qc_qcRect32.cpp",rect32,false)
+--local rect32 = lk.readall(output_directory,"qc_qcRect32.cpp")
+--rect32 = rect32:gsub("(%W)T(%W)","%1int32_t%2")
+--rect32 = rect32:gsub([[%*%*%(%(int32_t %*%)dub_checksdata_n%(L, 3, "int32_t"%)%);]],"(int32_t)lua_tonumber(L,3);")
+--lk.writeall(output_directory.."/qc_qcRect32.cpp",rect32,false)
 
 --[[
 dub.LuaBinder.COMPILER = 'c:/Devel/mingw/msys/1.0/bin/sh.exe -c "PATH=/bin:/mingw/bin env PATH=/c/Users/tim/bin:.:/usr/local/bin:/mingw/bin:/bin g++.exe '
