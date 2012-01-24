@@ -40,8 +40,8 @@ function lk.readall(basepath, path)
 end
 
 function lk.absolutizePath(path, base)
-  if not string.match(path, '^/') then
-    path = string.format('%s/%s', base or lfs.currentdir(), path)
+  if not platform.is_absolute(path) then
+    path = platform.clean_path(string.format('%s/%s', base or lfs.currentdir(), path))
   end
   -- resolve '/./' and '/../'
   local parts = lk.split(path, '/')

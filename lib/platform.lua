@@ -6,6 +6,7 @@ function platform.clean_path(p)
 	return p:gsub('\\','/')
 end
 
+
 local shell = os.getenv("SHELL")
 if shell and (shell:match("/bin/bash") or shell:match("/bin/sh")) then
 
@@ -35,6 +36,17 @@ else
 	end
 
 end
+
+function platform.is_absolute(p)
+
+	if platform.type=="windows" then
+		return (p:match('^/')) or (p:match("^[A-Za-z]:"))
+	else
+		return string.match(p, '^/')
+	end
+
+end
+
 
 
 return platform
