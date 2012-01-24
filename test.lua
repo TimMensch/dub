@@ -206,32 +206,35 @@ ttn.uint64_t = 'number'
 local destroyObjectRef=[[
 if (userdata->gc)
 {
-	// do I need two copies? I'm not sure if it's Kosher to let lua_rawset at the
-	// end pop one of the original parameters from the stack.
-
-	lua_pushvalue(L,-1); // ud ud
-	lua_pushvalue(L,-1); // ud ud ud
-
-	// look up userdata in registry to get smart pointer for this object
-	lua_rawget(L,LUA_REGISTRYINDEX); // ud ud smart_ud
+	lua_getfenv(L,-1); 		// ud env
+	lua_rawgeti(L,-1,2);	// ud env env[2]
 
 	OBJECT_TYPERef * s = (OBJECT_TYPERef*)lua_touserdata(L,-1);
-	lua_pop(L,1); // ud ud
-	lua_pushnil(L); // ud ud nil
-
-	// clear reference in registry
-	lua_rawset(L,LUA_REGISTRYINDEX);
-
 	delete s;
+
+	lua_pop(L,1);			// ud env
+	lua_pushnil(L);			// ud env nil
+	// env[2] = nil
+	lua_rawseti(L,-2,2);	// ud env
+	lua_pop(L,1);			// ud
 }
 userdata->gc = false;
 ]]
 
 local createObjectRef=[[
-OBJECT_TYPERef * ref = new OBJECT_TYPERef(OBJECT_TYPE::create(CREATE_PARMS));
-(*ref)->push(L);
-delete ref;
+OBJECT_TYPERef ref( OBJECT_TYPE::create(CREATE_PARMS) );
+ref->push<OBJECT_TYPE>(L);
 return 1;]]
+
+local push_template=[[
+%s->push<%s>(L); // push_template
+]]
+
+local pull_template=[[
+lua_pushvalue(L,%d); // ... ud
+lua_rawget(L,LUA_REGISTRYINDEX); // ... smart_ud
+%sRef &%s= *((%sRef*)lua_touserdata(L,-1)) ; // ... smart_ud
+lua_pop(L,1); // ... ]]
 
 --[[dub_pushudata(L, ref->get(), "OBJECT_TYPE", true);
 lua_pushvalue(L,-1); // dup userdata
@@ -277,7 +280,25 @@ local function sharedObjectDef(types)
 		b[v] =
 		{
 			['~'..v] = { body = destroyObjectRef:gsub("OBJECT_TYPE",v)},
-			serialize = { body = "(void)self; (void)tab; return 0;" }
+			serialize = { body = "(void)self; (void)tab; return 0;" },
+			_set_suffix = [[
+lua_getfenv(L,1); // obj key value fenv
+if (lua_istable(L, -1)) {
+  lua_insert(L,2); // obj fenv key value
+  lua_rawset(L,2);
+} else {
+  luaL_error(L, KEY_EXCEPTION_MSG, key);
+}
+]],
+			_get_suffix= [[
+lua_getfenv(L,1); // obj key fenv
+//if (lua_isnil(L,-1)) { lua_pop(L,1); luaL_error(L, KEY_EXCEPTION_MSG, key); }
+lua_pushvalue(L,2); // obj key fenv key
+lua_rawget(L,-2); // obj key fenv [result|nil]
+if (lua_isnil(L,-1)) { lua_pop(L,2); luaL_error(L, KEY_EXCEPTION_MSG, key); }
+lua_remove(L,-2); // obj key result
+return 1;
+]]
 		}
 
 		if create_parms then
@@ -293,19 +314,13 @@ local function sharedObjectDef(types)
 			-- Get value from Lua.
 			pull   =
 				function(name, position, prefix)
-					return format([[
-lua_pushvalue(L,%d); // ... ud
-lua_rawget(L,LUA_REGISTRYINDEX); // ... smart_ud
-%sRef &%s= *((%sRef*)lua_touserdata(L,-1)) ; // ... smart_ud
-lua_pop(L,1); // ... ]],position,v,name,v);
+					return format(pull_template,position,v,name,v);
 				end,
 
 			-- Push value in Lua
 			push   =
 				function(name)
-					return format([[
-%s->push(L); //
-]], name, name)
+					return format(push_template, name, v)
 				end,
 
 			-- Cast value
@@ -322,19 +337,13 @@ lua_pop(L,1); // ... ]],position,v,name,v);
 			-- Get value from Lua.
 			pull   =
 				function(name, position, prefix)
-					return format([[
-lua_pushvalue(L,%d); // ... ud
-lua_rawget(L,LUA_REGISTRYINDEX); // ... smart_ud
-%sRef &%s= *((%sRef*)lua_touserdata(L,-1)) ; // ... smart_ud
-lua_pop(L,1); // ... ]],position,v,name,v);
+					return format(pull_template,position,v,name,v);
 				end,
 
 			-- Push value in Lua
 			push   =
 				function(name)
-					return format([[
-%s->push(L); //
-]], name, name)
+					return format(push_template, name, v)
 				end,
 
 			-- Cast value
