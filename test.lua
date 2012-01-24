@@ -120,10 +120,10 @@ local ignore = {
 	"qc2dParticleRenderer", "qc2dParticleRendererPair", "ParticleList", "qcDeferDraw",
 	"qcParticleInitNullBase", "qcParticleUpdateBase", "qcParticleSystemImpl",
 	"qcCommitTextures", "qcOggStream", "qcFlashPlayer",
-	"qcDobCrypt", "qcFileInfo", "qcBuf",
+	"qcDobCrypt", "qcFileInfo", "qcBuf," }
 
 -- temporary ignores until the base class bug is fixed
-"qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
+--"qcAnimation", "qcDrawable", "qcObject", "qcSound", "qcStream" }
 
 ttn['qcBuf'] ={
 	type='qcBuf',
@@ -177,19 +177,23 @@ ttn['qc::string'] ={
 
   -- Get value from Lua.
   pull   = function(name, position, prefix)
-  return format('size_t %s_sz_;\nconst char *%s = %schecklstring(L, %i, &%s_sz_);//qc::string pull',
+  return format('size_t %s_sz_;\nconst char *%s = %schecklstring(L, %i, &%s_sz_);//qc::string pull\n',
                 name, name, prefix, position, name)
   end,
 
   -- Push value in Lua
   push   =
 	  function(name)
-		return format('lua_pushlstring(L, %s.c_str(), %s.length());//qc::string push', name, name)
+		  if name:match("%(") then
+			return format('qc::string __s = %s;\nlua_pushlstring(L, __s.c_str(), __s.length());//qc::string push', name)
+		  else
+			return format('qc::string & __s = %s;\nlua_pushlstring(L, __s.c_str(), __s.length());//qc::string push', name)
+		  end
 	  end,
 
   -- Cast value
   cast   = function(name)
-    return format('qc::string(%s, %s_sz_)/*cast*/', name, name)
+    return format('qc::string(%s, %s_sz_)', name, name)
   end,
 };
 
@@ -277,6 +281,35 @@ lua_pop(L,1); // ... ]],position,v,name,v);
 					return format('%s', name)
 				end,
 		}
+
+		ttn["shared_ptr< "..v.." >"]=
+		{
+			type   = "shared_ptr< "..v.." >",
+
+			-- Get value from Lua.
+			pull   =
+				function(name, position, prefix)
+					return format([[
+lua_pushvalue(L,%d); // ... ud
+lua_rawget(L,LUA_REGISTRYINDEX); // ... smart_ud
+%sRef &%s= *((%sRef*)lua_touserdata(L,-1)) ; // ... smart_ud
+lua_pop(L,1); // ... ]],position,v,name,v);
+				end,
+
+			-- Push value in Lua
+			push   =
+				function(name)
+					return format([[
+%s->push(L); //
+]], name, name)
+				end,
+
+			-- Cast value
+			cast   =
+				function(name)
+					return format('%s', name)
+				end,
+		}
 	end
 
 	return b;
@@ -284,7 +317,7 @@ lua_pop(L,1); // ... ]],position,v,name,v);
 end
 
 local custom_bindings = sharedObjectDef{
-	qcAnimation="animation",
+	qcAnimation="",
 	qcAnimationPlayer="animation",
 	qcArc="texture,segments,radius,start,stop,*color",
 	qcAtlas=false,
