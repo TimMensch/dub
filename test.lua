@@ -197,8 +197,11 @@ ttn['qc::string'] ={
   end,
 };
 
-ttn.qcReal = 'number'
 ttn.lua_Number = 'number'
+ttn.qcReal = 'number'
+
+ttn.int64_t = 'number' -- number instead of "int" because a "number" holds more
+ttn.uint64_t = 'number'
 
 local destroyObjectRef=[[
 if (userdata->gc)
