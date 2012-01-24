@@ -228,14 +228,15 @@ userdata->gc = false;
 ]]
 
 local createObjectRef=[[
-
 OBJECT_TYPERef * ref = new OBJECT_TYPERef(OBJECT_TYPE::create(CREATE_PARMS));
+(*ref)->push(L);
+delete ref;
+return 1;]]
 
-dub_pushudata(L, ref->get(), "OBJECT_TYPE", true);
+--[[dub_pushudata(L, ref->get(), "OBJECT_TYPE", true);
 lua_pushvalue(L,-1); // dup userdata
 lua_pushlightuserdata(L,ref); // a light user data wrapper for the smart pointer
 lua_rawset(L,LUA_REGISTRYINDEX);
-return 1;
 ]]
 
 local function sharedObjectDef(types)
