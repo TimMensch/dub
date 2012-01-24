@@ -239,11 +239,28 @@ lua_pushlightuserdata(L,ref); // a light user data wrapper for the smart pointer
 lua_rawset(L,LUA_REGISTRYINDEX);
 ]]
 
+local extra_headers = {
+	qcArc={ "qc/texture.h" }
+};
+
+--[[
+#include "qc/drawable.h"
+#include "qc/texture.h"
+#include "qc/texturelink.h"
+
+#include "qc/song.h"
+#include "qc/sound.h"
+#include "qc/animation.h"
+#include "qc/atlas.h"
+]]
+
 local function sharedObjectDef(types)
 
 	local b = {}
 
 	for v,create_parms in pairs( types ) do
+
+--        extra_headers[v]={ "qc/bind.h" };
 
 		b[v] =
 		{
@@ -410,6 +427,7 @@ local output_directory = '../qc/bindings/src'
 binder:bind(ins, {output_directory = output_directory,
 	single_lib="qc",
 	ignore=ignore,
+	extra_headers = extra_headers,
 	custom_bindings = custom_bindings,
 --	only = { "qcRect32" }
 })
@@ -420,6 +438,16 @@ local rect32 = lk.readall(output_directory,"qc_qcRect32.cpp")
 rect32 = rect32:gsub("(%W)T(%W)","%1int32_t%2")
 rect32 = rect32:gsub([[%*%*%(%(int32_t %*%)dub_checksdata_n%(L, 3, "int32_t"%)%);]],"(int32_t)lua_tonumber(L,3);")
 lk.writeall(output_directory.."/qc_qcRect32.cpp",rect32,false)
+
+local dub_h = lk.readall(output_directory,"dub/dub.h");
+dub_h = dub_h:gsub('#include "dub/','#include "')
+lk.writeall("../qc/include/dub/dub.h",dub_h,true)
+
+local dir = lk.Dir(output_directory.."/dub")
+-- Delete .h files
+for file in dir:glob('%.h$') do
+	lk.rmFile(file)
+end
 
 --[[
 dub.LuaBinder.COMPILER = 'c:/Devel/mingw/msys/1.0/bin/sh.exe -c "PATH=/bin:/mingw/bin env PATH=/c/Users/tim/bin:.:/usr/local/bin:/mingw/bin:/bin g++.exe '
