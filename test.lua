@@ -240,7 +240,19 @@ lua_rawset(L,LUA_REGISTRYINDEX);
 ]]
 
 local extra_headers = {
-	qcArc={ "qc/texture.h" }
+	["qc::qcArc"]={ "qc/texture.h" },
+	["qc::qcAnimation"]={ "qc/texture.h" },
+	["qc::qcAtlas"]={ "qc/texturelink.h" },
+	["qc::qcCurve"]={ "qc/texture.h" },
+	["qc::qcStream"]={ "qc/sound.h" },
+	["qc::qcDrawComponent"]={ "qc/drawable.h" },
+	["qc::qcMediaStore"]={
+		"qc/sound.h",
+		"qc/song.h",
+		"qc/texture.h",
+		"qc/atlas.h",
+		"qc/animation.h",
+		},
 };
 
 --[[
