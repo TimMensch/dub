@@ -219,7 +219,7 @@ if (userdata->gc)
 	lua_pop(L,1);			// ud
 }
 userdata->gc = false;
-]]
+return 0;]]
 
 local createObjectRef=[[
 OBJECT_TYPERef ref( OBJECT_TYPE::create(CREATE_PARMS) );
