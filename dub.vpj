@@ -217,7 +217,6 @@
 			<F N="test/fixtures/inherit/GrandParent.h"/>
 			<F N="lib/dub/lua/dub/lauxlib.h"/>
 			<F N="lib/dub/lua/dub/lua.h"/>
-			<F N="lua.sh"/>
 			<F N="lib/dub/lua/dub/luaconf.h"/>
 			<F N="test/fixtures/inherit_hidden/Mother.h"/>
 			<F N="test/fixtures/namespace/nem.h"/>
@@ -295,8 +294,6 @@
 			<F N="README.rdoc"/>
 			<F N="lib/dub/Template.lua"/>
 			<F N="test/template_test.lua"/>
-			<F N="test.lua"/>
-			<F N="test2.lua"/>
 			<F N="lib/lk/util.lua"/>
 			<F N="lib/xml.lua"/>
 		</Folder>
