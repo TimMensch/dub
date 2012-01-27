@@ -33,6 +33,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(disable:4244)
+#pragma warning(disable:4290)
 #pragma warning(disable:4800)
 #pragma warning(disable:4996)
 #endif
@@ -51,8 +52,8 @@ typedef int DubStackSize;
 extern "C" {
 #endif
 // We need C linkage because lua lib is compiled as C code
-#include "dub/lua.h"
-#include "dub/lauxlib.h"
+#include "lua.h"
+#include "lauxlib.h"
 #ifdef __cplusplus
 }
 #endif
