@@ -976,8 +976,13 @@ function private:switch(class, method, delta, bfunc, iterator)
     res = res .. 'void **retval__ = (void**)lua_newuserdata(L, sizeof(void*));\n'
   end
 
+  local filter = self.options.name_filter or function(s) return s end
+  local filtered_iterator =
+    (self.options.name_filter_iterator and
+     self.options.name_filter_iterator(class,iterator)) or iterator
+
   -- get key hash
-  local sz = dub.minHash(class, iterator, 'name')
+  local sz = dub.minHash(class, filtered_iterator, 'name')
   assert(sz, string.format("Something is wrong when creating function body '%s' for class '%s'.", method.name, class.name))
   res = res .. format('int key_h = dub_hash(key, %i);\n', sz)
   -- switch
@@ -986,9 +991,9 @@ function private:switch(class, method, delta, bfunc, iterator)
     local body = bfunc(self, method, elem, delta)
     if body then
       local name = elem.name
-      res = res .. format('  case %s: {\n', dub.hash(name, sz))
+      res = res .. format('  case %s: {\n', dub.hash(filter(name), sz), filter(name))
       -- get or set value
-      res = res .. format('    if (DUB_ASSERT_KEY(key, "%s")) break;\n', self:libName(elem))
+      res = res .. format('    if (DUB_ASSERT_KEY(key, "%s")) break;\n', filter(name))
       res = res .. '    ' .. string.gsub(body, '\n', '\n    ') .. '\n  }\n'
     end
   end
