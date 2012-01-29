@@ -8,6 +8,8 @@
   parse and create bindings.
 
 --]]------------------------------------------------------
+require 'platform'
+
 local lib     = {
   type = 'dub.Inspector',
   DOXYGEN_CMD = 'doxygen',
@@ -54,8 +56,7 @@ function lib:parse(opts)
       end
     end
   end
-
-  private.execute('mkdir -p ' .. doc_dir)
+  platform.mkdir(doc_dir)
 
   local doxypath = opts.Doxyfile
   if not doxypath then

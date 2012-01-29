@@ -6,6 +6,8 @@
   Use the dub.Inspector to create Lua bindings.
 
 --]]------------------------------------------------------
+require 'platform'
+
 local format  = string.format
 local lib     = {
   type = 'dub.LuaBinder',
@@ -84,9 +86,11 @@ local lib     = {
   -- relative to the bindings output directory.
   COPY_DUB_PATH  = '',
   COMPILER       = 'g++',
+  QUOTE = '',
   COMPILER_FLAGS = {
     macosx = '-g -Wall -Wl,-headerpad_max_install_names -flat_namespace -undefined suppress -dynamic -bundle -fPIC',
     linux  = '-g -Wall -Wl,-headerpad_max_install_names -flat_namespace -undefined suppress -dynamic -fPIC',
+    windows = '-g -Wall -Wl,-headerpad_max_install_names,--allow-shlib-undefined -shared  ',
   }
 }
 local private = {}
@@ -135,6 +139,7 @@ function lib:bind(inspector, options)
   end
 
   self.output_directory = self.output_directory or options.output_directory
+  platform.mkdir(self.output_directory)
   private.parseCustomBindings(self, options.custom_bindings)
   self.ins = inspector
   local bound = {}
@@ -190,7 +195,7 @@ function lib:build(opts)
   cmd = cmd .. self.COMPILER_FLAGS[private.platform()] .. ' '
   cmd = cmd .. flags .. ' '
   cmd = cmd .. '-o ' .. opts.output .. ' '
-  cmd = cmd .. files
+  cmd = cmd .. files .. self.QUOTE
   if opts.verbose then
     print(cmd)
   end
@@ -835,7 +840,8 @@ function private:copyDubFiles()
   local dub_path = self.COPY_DUB_PATH
   if dub_path then
     local base_path = self.output_directory .. dub_path
-    os.execute(format("mkdir -p '%s'", base_path))
+    platform.mkdir(base_path)
+
     -- path to current file
     local dir = lk.dir()
     local dub_dir = dir .. '/lua/dub'
@@ -848,6 +854,11 @@ end
 
 -- Detect platform
 function private.platform()
+
+  if platform.type=='windows' then
+    return 'windows'
+  end
+
   local name = io.popen('uname'):read()
   if not name or string.match(name, 'Darwin') then
     return 'macosx'
