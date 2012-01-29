@@ -977,9 +977,32 @@ function private:switch(class, method, delta, bfunc, iterator)
   end
 
   local filter = self.options.name_filter or function(s) return s end
-  local filtered_iterator =
-    (self.options.name_filter_iterator and
-     self.options.name_filter_iterator(class,iterator)) or iterator
+
+  local filtered_iterator = iterator
+
+  if self.options.name_filter then
+    filtered_iterator = function()
+      local function new_iterator()
+
+        local list={}
+        for elem in iterator(class) do
+          list[#list+1]= elem
+        end
+
+        for _,elem in ipairs(list) do
+
+          if elem and elem.name then
+            coroutine.yield( { name=filter(elem.name) } )
+          else
+            break
+          end
+        end
+        return nil
+      end
+
+      return coroutine.wrap(new_iterator)
+    end
+  end
 
   -- get key hash
   local sz = dub.minHash(class, filtered_iterator, 'name')
