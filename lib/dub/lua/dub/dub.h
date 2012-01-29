@@ -29,6 +29,14 @@
 #ifndef DUB_BINDING_GENERATOR_DUB_H_
 #define DUB_BINDING_GENERATOR_DUB_H_
 
+#include <string.h>  // strcmp etc.
+
+#ifdef _MSC_VER
+#pragma warning(disable:4244)
+#pragma warning(disable:4800)
+#pragma warning(disable:4996)
+#endif
+
 #ifndef DUB_ASSERT_KEY
 #define DUB_ASSERT_KEY(k, m) strcmp(k, m)
 // Use this to avoid the overhead of strcmp in get/set of public attributes.
