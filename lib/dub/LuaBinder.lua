@@ -125,7 +125,7 @@ function lib:bind(inspector, options)
     end
   end
 
-  if options.lib_prefix == false then
+  if options.lib_prefix == false or #options.lib_prefix==0 then
     options.lib_prefix = nil
   end
 
