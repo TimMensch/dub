@@ -33,6 +33,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(disable:4244)
+#pragma warning(disable:4290)
 #pragma warning(disable:4800)
 #pragma warning(disable:4996)
 #endif
