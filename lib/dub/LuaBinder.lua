@@ -265,8 +265,10 @@ function lib:functionBody(parent, method)
     method = parent
     parent = method.parent
 
-    -- global functions get global custom bindings
-    custom = self.custom_bindings[method.name]
+    -- global functions get global custom bindings (if any)
+    if self.custom_bindings then
+      custom = self.custom_bindings[method.name]
+    end
   else
     if parent.custom_bindings then
       custom = (parent.custom_bindings[method.parent.name] or {})[method.name]
@@ -805,7 +807,7 @@ function private:pushValue(method, value, return_value)
         end
       end
     else
-      -- Return value is a pointer
+      -- Return value is a pointer.
       res = format('%s%sretval__ = %s;\n',
         (ctype.const and 'const ') or '',
         rtype.create_name, value)
