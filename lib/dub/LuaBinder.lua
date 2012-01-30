@@ -255,19 +255,25 @@ end
 
 --- Create the body of the bindings for a given method/function.
 function lib:functionBody(parent, method)
+
+  local custom
+
   if not method then
     -- Just one parameter: global function. When creating method, we need the
     -- class because it could be a superclass method we are biding and thus the
     -- parent is not the correct one.
     method = parent
     parent = method.parent
+
+    -- global functions get global custom bindings
+    custom = self.custom_bindings[method.name]
+  else
+    if parent.custom_bindings then
+      custom = (parent.custom_bindings[method.parent.name] or {})[method.name]
+    end
   end
   -- Resolve C++ types to native lua types.
   self:resolveTypes(method)
-  local custom
-  if parent.custom_bindings then
-    custom = (parent.custom_bindings[method.parent.name] or {})[method.name]
-  end
   local res = ''
   if method.dtor then
     res = res .. format('DubUserdata *userdata = ((DubUserdata*)dub_checksdata(L, 1, "%s"));\n', self:libName(parent))
