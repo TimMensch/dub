@@ -38,18 +38,23 @@ function lib.new(self)
   self.variables_list = {}
   self.constants_list = {}
   self.super_list     = {}
-  self.dub            = self.dub or {}
-  self.dub_type       = self.dub.type
+  
   self.xml_headers    = self.xml_headers or {}
   setmetatable(self, lib)
+  self:setOpt(self.dub or {})
   self:setName(self.name)
-  return self
+  if self.dub.ignore == true then
+    return nil
+  else
+    return self
+  end
 end
 
 --=============================================== PUBLIC METHODS
 
 --- Return a child element from name.
 function lib:findChild(name)
+  private.makeSpecialMethods(self)
   return self.db:findChildFor(self, name)
 end
 
@@ -58,6 +63,8 @@ lib.method = lib.findChild
 
 --- Return an iterator over the methods of this class.
 function lib:methods()
+  -- Create --get--, --set-- and ~Destructor if needed.
+  private.makeSpecialMethods(self)
   return self.db:functions(self)
 end
 
@@ -69,6 +76,20 @@ end
 --- Return an iterator over the superclasses of this class.
 function lib:superclasses()
   return self.db:superclasses(self)
+end
+
+function lib:hasVariables()
+  if self.has_variables then
+    return true
+  end
+  -- Look in inheritance chain
+  for super in self:superclasses() do
+    if super:hasVariables() then
+      self.has_variables = true
+      return true
+    end
+  end
+  return false
 end
 
 --- Return an iterator over the constants defined in this class.
@@ -114,6 +135,12 @@ function lib:setName(name)
   self.create_name = create_name .. ' *'
 end
 
+function lib:setOpt(opt)
+  self.dub      = opt or {}
+  self.dub_type = self.dub.type
+  self.ignore   = self.dub.ignore or {}
+end
+
 -- Return the enclosing namespace or nil if none found.
 function lib:namespace()
   local p = self.parent
@@ -127,3 +154,10 @@ function lib:namespace()
 end
 
 --=============================================== PRIVATE
+function private:makeSpecialMethods()
+  if self.made_special_methods then
+    return
+  end
+  self.made_special_methods = true
+  dub.MemoryStorage.makeSpecialMethods(self)
+end

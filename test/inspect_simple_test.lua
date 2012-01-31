@@ -19,7 +19,7 @@ local ins = dub.Inspector {
   doc_dir = lk.dir() .. '/tmp',
   ignore  = {
     Simple = {
-      'shouldBeIgnored',
+      'ignoreInInspector',
     },
     'badFuncToIgnore',
   },
@@ -113,6 +113,7 @@ function should.listMembers()
     table.insert(res, child.name)
   end
   assertValueEqual({
+    'Map',
     'Simple',
     'Foo',
     'Bar',

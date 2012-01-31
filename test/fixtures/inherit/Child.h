@@ -16,7 +16,7 @@ class Mother;
  * 
  * Since Doxygen does not know that Mother is a Parent, we tell this. We also
  * use 'mixin' of custom bindings from ChildHelper.
- * @dub super: 'Parent,ChildHelper'
+ * @dub super: Parent, ChildHelper
  */
 class Child : public Mother {
   // Private attribute
@@ -41,6 +41,12 @@ public:
   std::string name();
 };
 
+/** This class should have set/get methods defined
+ * because it inherits attributes from its parents.
+ */
+class GrandChild : public Child {
+public:
+};
 #endif // INHERIT_CHILD_H_
 
 
