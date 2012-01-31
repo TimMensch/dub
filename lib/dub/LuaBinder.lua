@@ -525,9 +525,15 @@ function lib:customTypeAccessor(method)
 end
 
 -- Return the 'public' name to use for the element in the
--- bindings. This can be used to rename classes or namespaces.
+-- bindings. This can be used to rename classes or namespaces. Instead
+-- of rewriting this method, users can also use the 'name_filter' option.
 function lib:name(elem)
-  return elem.name
+  local func = self.options.name_filter
+  if func then
+    return func(elem)
+  else
+    return elem.name
+  end
 end
 
 -- Return the 'lua_open' name to use for the element in the
@@ -540,9 +546,26 @@ function lib:openName(elem)
   end
 end
 
--- Return the 'public' name to use for a constant.
+-- Return the 'public' name to use for a constant. Instead of rewriting this
+-- method, users can also use the 'const_name_filter' option.
 function lib:constName(name)
-  return name
+  local func = self.options.const_name_filter
+  if func then
+    return func(name)
+  else
+    return name
+  end
+end
+
+-- Return the 'public' name to use for an attribute. Instead of rewriting this
+-- method, users can also use the 'attr_name_filter' option.
+function lib:attrName(elem)
+  local func = self.options.attr_name_filter
+  if func then
+    return func(elem)
+  else
+    return elem.name
+  end
 end
 
 function lib:libName(elem)
@@ -781,7 +804,12 @@ function private:pushValue(method, value, return_value)
     -- resolved value
     local rtype = lua.rtype
     local gc
+
     if not ctype.ptr then
+      -- Call return value is not a pointer. This should never happen with
+      -- a type that uses a custom push method.
+      assert(not rtype.dub or not rtype.dub.push,
+        string.format("Types with @dub 'push' setting should not be passed as values (%s).", method:fullname()))
       if method.is_get_attr then
         if ctype.const then
           if self.options.read_const_member == 'copy' then
@@ -794,16 +822,27 @@ function private:pushValue(method, value, return_value)
         else
           res = format('dub_pushudata(L, &%s, "%s", false);', value, lua.mt_name)
         end
+      elseif return_value.ref then
+        -- Return value is a reference.
+        if ctype.const then
+          if self.options.read_const_member == 'copy' then
+            -- copy
+            res = format('dub_pushudata(L, new %s(%s), "%s", true);', rtype.name, value, lua.mt_name)
+          else
+            -- cast
+            res = format('dub_pushudata(L, const_cast<%s*>(&%s), "%s", false);', rtype.name, value, lua.mt_name)
+          end
+        else
+          -- not const ref
+          res = format('dub_pushudata(L, &%s, "%s", false);', value, lua.mt_name)
+        end
       else
-        -- Return value is not a pointer: we have a copy
+        -- Return by value.
         if method.parent.dub and method.parent.dub.destroy == 'free' then
           res = format('dub_pushfulldata<%s>(L, %s, "%s");', rtype.name, value, lua.mt_name)
         else
-          if (not return_value.const) and return_value.def:match("&$") then
-            res = format('dub_pushudata(L, &%s, "%s", false);', value, lua.mt_name)
-          else
-            res = format('dub_pushudata(L, new %s(%s), "%s", true);', rtype.name, value, lua.mt_name)
-          end
+          -- Allocate on the heap.
+          res = format('dub_pushudata(L, new %s(%s), "%s", true);', rtype.name, value, lua.mt_name)
         end
       end
     else
@@ -814,20 +853,33 @@ function private:pushValue(method, value, return_value)
       if not method.ctor then
         res = res .. 'if (!retval__) return 0;\n'
       end
+      local push_method = rtype.dub and rtype.dub.push
+      local custom_push
+      if push_method then
+        custom_push = true
+        push_method = 'retval__->'.. push_method
+      else
+        push_method = 'dub_pushudata'
+      end
       if ctype.const then
+        assert(not custom_push, string.format("Types with @dub 'push' setting should not be passed as const types (%s).", method:fullname()))
         if self.options.read_const_member == 'copy' then
           -- copy
-          res = res .. format('dub_pushudata(L, new %s(*retval__), "%s", true);', rtype.name, lua.mt_name)
+          res = res .. format('%s(L, new %s(*retval__), "%s", true);',
+                              push_method, rtype.name, lua.mt_name)
         else
           -- cast
-          res = res .. format('dub_pushudata(L, const_cast<%s*>(retval__), "%s", false);', rtype.name, lua.mt_name)
+          res = res .. format('%s(L, const_cast<%s*>(retval__), "%s", false);',
+                              push_method, rtype.name, lua.mt_name)
         end
       else
         -- We should only GC in constructor.
-        if (method.static and method.name==lua.mt_name) or method.dub and method.dub.gc then
-          res = res .. format('dub_pushudata(L, retval__, "%s", true);', lua.mt_name)
+        if method.ctor or (method.dub and method.dub.gc) then
+          res = res .. format('%s(L, retval__, "%s", true);',
+                              push_method, lua.mt_name)
         else
-          res = res .. format('dub_pushudata(L, retval__, "%s", false);', lua.mt_name)
+          res = res .. format('%s(L, retval__, "%s", false);',
+                              push_method, lua.mt_name)
         end
       end
     end
@@ -988,48 +1040,46 @@ function private:switch(class, method, delta, bfunc, iterator)
     res = res .. 'void **retval__ = (void**)lua_newuserdata(L, sizeof(void*));\n'
   end
 
-  local filter = self.options.name_filter or function(s) return s end
+  local filter
 
-  local filtered_iterator = iterator
-
-  if self.options.name_filter then
-    filtered_iterator = function()
-      local function new_iterator()
-
-        local list={}
-        for elem in iterator(class) do
-          list[#list+1]= elem
-        end
-
-        for _,elem in ipairs(list) do
-
-          if elem and elem.name then
-            coroutine.yield( { name=filter(elem.name) } )
-          else
-            break
-          end
-        end
-        return nil
-      end
-
-      return coroutine.wrap(new_iterator)
+  if method.is_cast then
+    filter = function(elem)
+      return self:libName(elem)
+    end
+  else
+    filter = function(elem)
+      return self:attrName(elem)
     end
   end
 
+  local filtered_iterator = function()
+    local function new_iterator()
+      for elem in iterator(class) do
+        local name = filter(elem)
+        if name then
+          coroutine.yield(name)
+        end
+      end
+    end
+    return coroutine.wrap(new_iterator)
+  end
+
   -- get key hash
-  local sz = dub.minHash(class, filtered_iterator, 'name')
+  local sz = dub.minHash(class, filtered_iterator)
   assert(sz, string.format("Something is wrong when creating function body '%s' for class '%s'.", method.name, class.name))
   res = res .. format('int key_h = dub_hash(key, %i);\n', sz)
   -- switch
   res = res .. 'switch(key_h) {\n'
   for elem in iterator(class) do
-    local body = bfunc(self, method, elem, delta)
-    if body then
-      local name = elem.name
-      res = res .. format('  case %s: {\n', dub.hash(filter(name), sz), filter(name))
-      -- get or set value
-      res = res .. format('    if (DUB_ASSERT_KEY(key, "%s")) break;\n', filter(name))
-      res = res .. '    ' .. string.gsub(body, '\n', '\n    ') .. '\n  }\n'
+    local lua_name = filter(elem)
+    if lua_name then
+      local body = bfunc(self, method, elem, delta)
+      if body then
+        res = res .. format('  case %s: {\n', dub.hash(lua_name, sz))
+        -- get or set value
+        res = res .. format('    if (DUB_ASSERT_KEY(key, "%s")) break;\n', lua_name)
+        res = res .. '    ' .. string.gsub(body, '\n', '\n    ') .. '\n  }\n'
+      end
     end
   end
   res = res .. '}\n'
