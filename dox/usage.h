@@ -11,8 +11,16 @@
  * @paragraph dub_destroy_free_1 Inspector Command
  * @code
  * local a = inspector.find("classname");
- * a.dub = { init:"luaInit" }
+ * a.dub = { destroy = "free" }
  * @endcode
+ *
+ * This enables objects to be created with in-place new, preventing an
+ * allocation and a copy, and it also completely disables the __gc garbage
+ * collection callback for the class.
+ *
+ * Ideal for POD types that support operators. A vector class Vec2 that supports
+ * operator+, for example, would be able to create a single extra Lua USERDATA
+ * with an embedded Vec2 result constructed right in the USERDATA.
  *
  * @subsubsection dub_class_init Post-Creation Init
  *
@@ -24,7 +32,7 @@
  * @paragraph dub_class_init_2 Inspector Command
  * @code
  * local a = inspector.find("classname");
- * a.dub = { init:"luaInit" }
+ * a.dub = { init = "luaInit" }
  * @endcode
  *
  * @paragraph dub_class_init_3 Inspector Command
