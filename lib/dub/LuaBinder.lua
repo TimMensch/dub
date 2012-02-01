@@ -276,7 +276,7 @@ function lib:functionBody(parent, method)
   self:resolveTypes(method)
   local res = ''
   if method.dtor then
-    res = res .. format('DubUserdata *userdata = ((DubUserdata*)dub_checksdata(L, 1, "%s"));\n', self:libName(parent))
+    res = res .. format('DubUserdata *userdata = ((DubUserdata*)dub_checksdata_d(L, 1, "%s"));\n', self:libName(parent))
     if custom and custom.body then
       res = res .. custom.body
     else

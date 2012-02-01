@@ -15,6 +15,7 @@ require 'lubyk'
 -- Run the test with the dub directory as current path.
 local should = test.Suite('dub.LuaBinder - thread')
 local binder = dub.LuaBinder()
+local print_out
 
 local ins = dub.Inspector {
   INPUT    = 'test/fixtures/thread',
@@ -68,7 +69,6 @@ function should.bindCompileAndLoad()
       },
     }
     package.cpath = tmp_path .. '/?.so'
-    --require 'Box'
     require 'thread'
     assertType('table', thread.Callback)
     assertType('table', thread.Caller)
@@ -148,18 +148,26 @@ function should.useSelfErrorHandler()
     r = ...
   end
   makeCall(c, 'something')
-  assertEqual('test/lua_thread_test.lua:145: Failure....', r)
+  assertMatch('test/lua_thread_test.lua:[0-9]+: Failure....', r)
 end
 
 function should.printErrorIfNoErrorHandler()
+  local print_bak = print
+  -- On object the created default error handler calls print. We hack
+  -- print to get the output.
+  function print(s)
+    print_out = s
+  end
   local c = thread.Callback('Alan Watts')
   local r
   function c:callback(value)
-    error('Normal output during testing.')
+    error('Printed error.')
   end
   assertPass(function()
     makeCall(c, 'something')
   end)
+  print = print_bak
+  assertMatch('lua_thread_test.lua.*Printed error', print_out)
 end
 
 --=============================================== Memory
@@ -168,6 +176,17 @@ function should.passSameObjectWhenStoredAsPointer()
   local c = thread.Callback('Alan Watts')
   local owner = thread.Caller(c)
   assertEqual(c, owner.clbk_) -- same table
+end
+
+function should.destroyFromCpp()
+  local c = thread.Callback('Arty')
+  local o = thread.Caller(c)
+  o:destroyCallback()
+  -- Destructor called in C++
+  -- Object is dead in Lua
+  assertError('using deleted thread.Callback', function()
+   c.name = 'foo'
+  end)
 end
 
 function should.notGcWhenStored()
