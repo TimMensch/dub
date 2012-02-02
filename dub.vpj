@@ -190,52 +190,14 @@
 				Value="Executable"/>
 		</List>
 	</Config>
-	<Files>
+	<CustomFolders>
 		<Folder
 			Name="Source Files"
 			Filters="*.c;*.C;*.cc;*.cpp;*.cp;*.cxx;*.c++;*.prg;*.pas;*.dpr;*.asm;*.s;*.bas;*.java;*.cs;*.sc;*.e;*.cob;*.html;*.rc;*.tcl;*.py;*.pl;*.d">
-			<F N="lib/dub/lua/class.cpp"/>
-			<F N="lib/dub/lua/dub/dub.cpp"/>
-			<F N="lib/dub/lua/lib.cpp"/>
-			<F N="test/fixtures/thread/lua_callback.cpp"/>
-			<F N="test/fixtures/pointers/vect.cpp"/>
 		</Folder>
 		<Folder
 			Name="Header Files"
 			Filters="*.h;*.H;*.hh;*.hpp;*.hxx;*.inc;*.sh;*.cpy;*.if">
-			<F N="test/fixtures/namespace/A.h"/>
-			<F N="test/fixtures/pointers/Abstract.h"/>
-			<F N="test/fixtures/namespace/B.h"/>
-			<F N="test/fixtures/pointers/Box.h"/>
-			<F N="test/fixtures/thread/Callback.h"/>
-			<F N="test/fixtures/thread/Caller.h"/>
-			<F N="test/fixtures/constants/Car.h"/>
-			<F N="test/fixtures/inherit/Child.h"/>
-			<F N="test/fixtures/inherit/ChildHelper.h"/>
-			<F N="lib/dub/lua/dub/dub.h"/>
-			<F N="test/fixtures/template/Foo.h"/>
-			<F N="test/fixtures/inherit/GrandParent.h"/>
-			<F N="lib/dub/lua/dub/lauxlib.h"/>
-			<F N="lib/dub/lua/dub/lua.h"/>
-			<F N="lib/dub/lua/dub/luaconf.h"/>
-			<F N="test/fixtures/inherit_hidden/Mother.h"/>
-			<F N="test/fixtures/namespace/nem.h"/>
-			<F N="test/fixtures/memory/Nogc.h"/>
-			<F N="test/fixtures/inherit/Object.h"/>
-			<F N="test/fixtures/inherit/Orphan.h"/>
-			<F N="test/fixtures/namespace/Out.h"/>
-			<F N="test/fixtures/memory/Owner.h"/>
-			<F N="test/fixtures/inherit/Parent.h"/>
-			<F N="test/fixtures/memory/Pen.h"/>
-			<F N="test/fixtures/memory/PrivateDtor.h"/>
-			<F N="test/fixtures/simple/include/simple.h"/>
-			<F N="test/fixtures/namespace/TRect.h"/>
-			<F N="test/fixtures/template/TVect.h"/>
-			<F N="test/fixtures/constants/types.h"/>
-			<F N="test/fixtures/simple/include/types.h"/>
-			<F N="test/fixtures/template/types.h"/>
-			<F N="test/fixtures/pointers/Vect.h"/>
-			<F N="test/fixtures/memory/Withgc.h"/>
 		</Folder>
 		<Folder
 			Name="Resource Files"
@@ -246,25 +208,108 @@
 		<Folder
 			Name="Other Files"
 			Filters="">
-			<F N=".gitignore"/>
-			<F N="test/fixtures/namespace/A.yml"/>
-			<F N="test/all.lua"/>
+		</Folder>
+	</CustomFolders>
+	<Files AutoFolders="DirectoryView">
+		<Folder Name="dox">
+			<F N="dox/usage.h"/>
+		</Folder>
+		<Folder Name="lib">
+			<Folder Name="dub">
+				<Folder Name="lua">
+					<Folder Name="dub">
+						<F N="lib/dub/lua/dub/dub.cpp"/>
+						<F N="lib/dub/lua/dub/dub.h"/>
+						<F N="lib/dub/lua/dub/lauxlib.h"/>
+						<F N="lib/dub/lua/dub/lua.h"/>
+						<F N="lib/dub/lua/dub/luaconf.h"/>
+					</Folder>
+					<F N="lib/dub/lua/class.cpp"/>
+					<F N="lib/dub/lua/lib.cpp"/>
+				</Folder>
+				<F N="lib/dub/Class.lua"/>
+				<F N="lib/dub/CTemplate.lua"/>
+				<F N="lib/dub/Doxyfile"/>
+				<F N="lib/dub/Function.lua"/>
+				<F N="lib/dub/Inspector.lua"/>
+				<F N="lib/dub/LuaBinder.lua"/>
+				<F N="lib/dub/MemoryStorage.lua"/>
+				<F N="lib/dub/Namespace.lua"/>
+				<F N="lib/dub/Object.lua"/>
+				<F N="lib/dub/Template.lua"/>
+			</Folder>
+			<Folder Name="lk">
+				<F N="lib/lk/Dir.lua"/>
+				<F N="lib/lk/Lubyk.lua"/>
+				<F N="lib/lk/util.lua"/>
+			</Folder>
 			<F N="lib/Autoload.lua"/>
-			<F N="test/fixtures/inherit/ChildHelper.yml"/>
-			<F N="lib/dub/Class.lua"/>
-			<F N="test/class_test.lua"/>
-			<F N="lib/dub/CTemplate.lua"/>
-			<F N="lib/lk/Dir.lua"/>
-			<F N="lib/dub/Doxyfile"/>
-			<F N="test/fixtures/simple/Doxyfile"/>
 			<F N="lib/dub.lua"/>
-			<F N="dub.vpj"/>
-			<F N="dub.vpw"/>
-			<F N="dub.vpwhist"/>
+			<F N="lib/LuaXml.lua"/>
+			<F N="lib/platform.lua"/>
+			<F N="lib/xml.lua"/>
+		</Folder>
+		<Folder Name="test">
+			<Folder Name="fixtures">
+				<Folder Name="constants">
+					<F N="test/fixtures/constants/Car.h"/>
+					<F N="test/fixtures/constants/types.h"/>
+				</Folder>
+				<Folder Name="inherit">
+					<F N="test/fixtures/inherit/Child.h"/>
+					<F N="test/fixtures/inherit/ChildHelper.h"/>
+					<F N="test/fixtures/inherit/ChildHelper.yml"/>
+					<F N="test/fixtures/inherit/GrandParent.h"/>
+					<F N="test/fixtures/inherit/Object.h"/>
+					<F N="test/fixtures/inherit/Orphan.h"/>
+					<F N="test/fixtures/inherit/Parent.h"/>
+				</Folder>
+				<Folder Name="inherit_hidden">
+					<F N="test/fixtures/inherit_hidden/Mother.h"/>
+				</Folder>
+				<Folder Name="memory">
+					<F N="test/fixtures/memory/Nogc.h"/>
+					<F N="test/fixtures/memory/Owner.h"/>
+					<F N="test/fixtures/memory/Pen.h"/>
+					<F N="test/fixtures/memory/PrivateDtor.h"/>
+					<F N="test/fixtures/memory/Withgc.h"/>
+				</Folder>
+				<Folder Name="namespace">
+					<F N="test/fixtures/namespace/A.h"/>
+					<F N="test/fixtures/namespace/A.yml"/>
+					<F N="test/fixtures/namespace/B.h"/>
+					<F N="test/fixtures/namespace/nem.h"/>
+					<F N="test/fixtures/namespace/Out.h"/>
+					<F N="test/fixtures/namespace/TRect.h"/>
+				</Folder>
+				<Folder Name="pointers">
+					<F N="test/fixtures/pointers/Abstract.h"/>
+					<F N="test/fixtures/pointers/Box.h"/>
+					<F N="test/fixtures/pointers/vect.cpp"/>
+					<F N="test/fixtures/pointers/Vect.h"/>
+				</Folder>
+				<Folder Name="simple">
+					<Folder Name="include">
+						<F N="test/fixtures/simple/include/simple.h"/>
+						<F N="test/fixtures/simple/include/types.h"/>
+					</Folder>
+					<F N="test/fixtures/simple/Doxyfile"/>
+				</Folder>
+				<Folder Name="template">
+					<F N="test/fixtures/template/Foo.h"/>
+					<F N="test/fixtures/template/TVect.h"/>
+					<F N="test/fixtures/template/types.h"/>
+				</Folder>
+				<Folder Name="thread">
+					<F N="test/fixtures/thread/Callback.h"/>
+					<F N="test/fixtures/thread/Caller.h"/>
+					<F N="test/fixtures/thread/lua_callback.cpp"/>
+				</Folder>
+			</Folder>
+			<F N="test/all.lua"/>
+			<F N="test/class_test.lua"/>
 			<F N="test/dub_test.lua"/>
-			<F N="lib/dub/Function.lua"/>
 			<F N="test/function_test.lua"/>
-			<F N="History.txt"/>
 			<F N="test/inspect_box2d_test.lua"/>
 			<F N="test/inspect_constants_test.lua"/>
 			<F N="test/inspect_inherit_test.lua"/>
@@ -274,8 +319,6 @@
 			<F N="test/inspect_simple_test.lua"/>
 			<F N="test/inspect_template_test.lua"/>
 			<F N="test/inspect_thread_test.lua"/>
-			<F N="lib/dub/Inspector.lua"/>
-			<F N="LICENSE"/>
 			<F N="test/lua_box2d_test.lua"/>
 			<F N="test/lua_constants_test.lua"/>
 			<F N="test/lua_inherit_test.lua"/>
@@ -284,18 +327,14 @@
 			<F N="test/lua_pointers_test.lua"/>
 			<F N="test/lua_simple_test.lua"/>
 			<F N="test/lua_template_test.lua"/>
-			<F N="lib/dub/LuaBinder.lua"/>
-			<F N="lib/LuaXml.lua"/>
-			<F N="lib/lk/Lubyk.lua"/>
-			<F N="lib/dub/MemoryStorage.lua"/>
-			<F N="lib/dub/Namespace.lua"/>
-			<F N="lib/dub/Object.lua"/>
-			<F N="lib/platform.lua"/>
-			<F N="README.rdoc"/>
-			<F N="lib/dub/Template.lua"/>
 			<F N="test/template_test.lua"/>
-			<F N="lib/lk/util.lua"/>
-			<F N="lib/xml.lua"/>
 		</Folder>
+		<F N=".gitignore"/>
+		<F N="dub.vpj"/>
+		<F N="dub.vpw"/>
+		<F N="dub.vpwhist"/>
+		<F N="History.txt"/>
+		<F N="LICENSE"/>
+		<F N="README.rdoc"/>
 	</Files>
 </Project>
