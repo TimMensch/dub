@@ -209,7 +209,7 @@ end
 
 --- Return a string containing the Lua bindings for a class.
 function lib:bindClass(class)
-  dub.MemoryStorage.makeSpecialMethods(class, self.custom_bindings)
+  private.expandClass(self, class)
   if not self.class_template then
     -- path to current file
     local dir = lk.dir()
@@ -240,7 +240,7 @@ function private:callWithParams(class, method, param_delta, indent, custom, max_
     if method.array_set then
       -- C array attribute set
       local i_name = method.params_list[1].name
-      res = method.name .. '[' .. i_name .. '] = '
+      res = res .. 'self->' .. method.name .. '[' .. i_name .. '-1] = '
       res = res .. private.paramForCall(method.params_list[2]) .. ';\n'
       res = res .. 'return 0;'
     else
@@ -253,28 +253,19 @@ end
 
 --- Create the body of the bindings for a given method/function.
 function lib:functionBody(parent, method)
-
-  local custom
-
   if not method then
     -- Just one parameter: global function. When creating method, we need the
     -- class because it could be a superclass method we are biding and thus the
     -- parent is not the correct one.
     method = parent
     parent = method.parent
-
-    -- global functions get global custom bindings (if any)
-    if self.custom_bindings then
-      custom = self.custom_bindings[method.name]
-    end
-  else
-    if self.custom_bindings then
-      custom = (self.custom_bindings[method.parent.name] or {})[method.name]
-    end
   end
+
   -- Resolve C++ types to native lua types.
   self:resolveTypes(method)
+  local custom = private.customMetBinding(self, method.parent.name, method.name)
   local res = ''
+
   if method.dtor then
     res = res .. format('DubUserdata *userdata = ((DubUserdata*)dub_checksdata_d(L, 1, "%s"));\n', self:libName(parent))
     if custom and custom.body then
@@ -928,9 +919,18 @@ end
 
 -- function body to set a variable.
 function private:setAttrBody(method, attr, delta)
-  local custom = (self.custom_bindings[method.parent.name] or {})[attr.name]
+  local custom = private.customAttrBinding(self, method.parent.name, attr.name)
   if custom and custom.set then
-    return custom.set
+    if custom.set:match(';') then
+      -- Full custom binding definition
+      return custom.set
+    else
+      -- Alias to a function call
+      local met = method.parent:method(custom.set)
+      assert(met, format("Custom attribute binding for '%s' but '%s' method not found.", attr.name, custom.set))
+      self:resolveTypes(met)
+      return private.callWithParams(self, met.parent, met, delta + 1, '')
+    end
   end
 
   local name = attr.name
@@ -984,9 +984,18 @@ function private:getAttrBody(method, attr, delta)
   if attr.ctype.const and self.options.read_const_member == 'no' then
     return nil
   end
-  local custom = (self.custom_bindings[method.parent.name] or {})[attr.name]
+  local custom = private.customAttrBinding(self, method.parent.name, attr.name)
   if custom and custom.get then
-    return custom.get
+    if custom.get:match(';') then
+      -- Full custom binding definition
+      return custom.get
+    else
+      -- Alias to a function call
+      local met = method.parent:method(custom.get)
+      assert(met, format("Custom attribute binding for '%s' but '%s' method not found.", attr.name, custom.get))
+      self:resolveTypes(met)
+      return private.callWithParams(self, met.parent, met, delta, '')
+    end
   end
 
   local lua = self:luaType(method.parent, attr.ctype)
@@ -1089,8 +1098,8 @@ function private:switch(class, method, delta, bfunc, iterator)
 
   local custom = self.custom_bindings[method.parent.name] or {}
   if method.is_set_attr then
-    if custom._set_suffix then
-      res = res .. custom._set_suffix
+    if custom.set_suffix then
+      res = res .. custom.set_suffix
     else
       res = res .. 'if (lua_istable(L, 1)) {\n'
       -- <tbl> <'key'> <value>
@@ -1101,8 +1110,8 @@ function private:switch(class, method, delta, bfunc, iterator)
       -- If <self> is a table, write there
     end
   elseif method.is_get_attr then
-    if custom._get_suffix then
-      res = res .. custom._get_suffix
+    if custom.get_suffix then
+      res = res .. custom.get_suffix
       return res -- skip the return 0 below
     end
   end
@@ -1123,19 +1132,24 @@ function private:parseCustomBindings(custom)
     local dir = lk.Dir(custom)
     custom = {}
     for yaml_file in dir:glob('%.yml') do
-      local name = string.match(yaml_file, '([^/]+)%.yml$')
+      -- Class or global function name.
+      local elem_name = string.match(yaml_file, '([^/]+)%.yml$')
       local lua = yaml.loadpath(yaml_file).lua
-      for method_name, body in pairs(lua) do
-        if type(body) == 'string' then
-          -- strip last newline
-          lua[method_name] = {body = string.sub(body, 1, -2)}
-        else
-          for k, v in pairs(body) do
-            body[k] = string.sub(v, 1, -2)
+      for _, group in pairs(lua) do
+        -- attributes, methods
+        for name, body in pairs(group) do
+          -- each attribute or method
+          if type(body) == 'string' then
+            -- strip last newline
+            group[name] = {body = string.sub(body, 1, -2)}
+          else
+            for k, v in pairs(body) do
+              body[k] = string.sub(v, 1, -2)
+            end
           end
         end
       end
-      custom[name] = lua
+      custom[elem_name] = lua
     end
   end
   self.custom_bindings = custom or {}
@@ -1309,4 +1323,41 @@ function private:parseExtraHeadersList(base, list)
       private.parseExtraHeadersList(self, k, elem)
     end
   end
+end
+
+function private:customAttrBinding(class_name, attr_name)
+  local custom = self.custom_bindings[class_name]
+  local custom = custom and custom.attributes
+  return custom and custom[attr_name]
+end
+
+function private:customMetBinding(class_name, method_name)
+  local custom = self.custom_bindings[class_name]
+  local custom = custom and custom.methods
+  return custom and custom[method_name]
+end
+
+-- Add extra methods and attributes as needed by settings in 
+-- custom_bindings.
+function private:expandClass(class)
+  -- Merge pseudo attributes in class variables.
+  local custom = self.custom_bindings[class.name] or {}
+  local attrs = custom.attributes
+  if attrs then
+    local list = class.variables_list
+    local cache = class.cache
+    for name, _ in pairs(attrs) do
+      if not cache[name] then
+        class.has_variables = true
+        local attr = {
+          name  = name,
+          -- dummy type
+          ctype = dub.MemoryStorage.makeType('void'),
+        }
+        table.insert(list, attr)
+        cache[name] = attr
+      end
+    end
+  end
+  dub.MemoryStorage.makeSpecialMethods(class, self.custom_bindings)
 end
