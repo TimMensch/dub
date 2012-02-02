@@ -248,17 +248,22 @@ end
 
 --- Create the body of the bindings for a given method/function.
 function lib:functionBody(parent, method)
+
+  local custom
+
   if not method then
     -- Just one parameter: global function. When creating method, we need the
     -- class because it could be a superclass method we are biding and thus the
     -- parent is not the correct one.
     method = parent
     parent = method.parent
+    custom = private.customGlobalMetBinding(self, method.name)
+  else
+    custom = private.customMetBinding(self, method.parent.name, method.name)
   end
 
   -- Resolve C++ types to native lua types.
   self:resolveTypes(method)
-  local custom = private.customMetBinding(self, method.parent.name, method.name)
   local res = ''
 
   if method.dtor then
@@ -1306,6 +1311,11 @@ function private:parseExtraHeadersList(base, list)
   end
 end
 
+function private:customGlobalMetBinding(method_name)
+  local custom = self.custom_bindings.methods
+  return custom and custom[method_name]
+end
+
 function private:customAttrBinding(class_name, attr_name)
   local custom = self.custom_bindings[class_name]
   local custom = custom and custom.attributes
@@ -1318,7 +1328,7 @@ function private:customMetBinding(class_name, method_name)
   return custom and custom[method_name]
 end
 
--- Add extra methods and attributes as needed by settings in 
+-- Add extra methods and attributes as needed by settings in
 -- custom_bindings.
 function private:expandClass(class)
   -- Merge pseudo attributes in class variables.
