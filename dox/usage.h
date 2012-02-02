@@ -1,6 +1,12 @@
 /**
  * @page dub_usage Dub Usage
  *
+ * @subsection custom_bindings Custom Class, Function, and Attribute Bindings
+ *
+ * @warning Whether a binding has a semicolon changes its behavior, at least in
+ *  		accessor bindings. Should talk about this more, and see where the
+ *  		behavior changes.
+ *
  * @subsection dub_method_overrides Method Overrides
  *
  * @subsubsection dub_gc Mark this function as factory method.
