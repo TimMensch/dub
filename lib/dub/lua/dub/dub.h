@@ -145,7 +145,7 @@ public:
   /** Push any lua value from self on the stack.
    */
   void dub_pushvalue(const char *name);
-  
+
   /** Execute the protected call. If an error occurs, dub tries to find
    * an 'error' function in <self> and calls this function with the
    * error string. If no error function is found, the error message is
@@ -181,7 +181,7 @@ struct DubRef {
         ref = (DubRef*)*ptr;
         luaL_unref(L, LUA_REGISTRYINDEX, ref->ref);
       } else {
-        ref = new DubRef();
+        ref = new DubRef;
         *ptr = ref;
       }
       ref->ref = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -296,7 +296,7 @@ void **dub_checkudata(lua_State *L, int ud, const char *tname, bool keep_mt = fa
 
 // Super aware userdata calls (finds userdata inside provided table with table.super).
 void **dub_checksdata(lua_State *L, int ud, const char *tname, bool keep_mt = false) throw(dub::Exception);
-// Super aware userdata calls that DOES NOT check for dangling pointers (used in 
+// Super aware userdata calls that DOES NOT check for dangling pointers (used in
 // __gc binding).
 void **dub_checksdata_d(lua_State *L, int ud, const char *tname) throw(dub::Exception);
 // Return true if the type is correct. Used to resolve overloaded functions when there
