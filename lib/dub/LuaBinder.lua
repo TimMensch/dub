@@ -769,7 +769,11 @@ function private:doCall(parent, method, max_arg)
     res = res .. ')'
   end
   if method.ctor then
-    res = 'new ' .. res
+  	-- objects that are destroy:free shouldn't be allocated with new
+	-- at all.
+    if not (method.parent.dub and method.parent.dub.destroy == 'free') then
+      res = 'new ' .. res
+    end
   elseif method.member then
     res = self.SELF .. '->' .. res
   elseif parent.is_scope then
@@ -847,40 +851,47 @@ function private:pushValue(method, value, return_value)
         end
       end
     else
-      -- Return value is a pointer.
-      res = format('%s%sretval__ = %s;\n',
-        (ctype.const and 'const ') or '',
-        rtype.create_name, value)
-      if not method.ctor then
-        res = res .. 'if (!retval__) return 0;\n'
-      end
-      local push_method = rtype.dub and rtype.dub.push
-      local custom_push
-      if push_method then
-        custom_push = true
-        push_method = 'retval__->'.. push_method
+	  -- Constructors end up here, but constructors of objects that are
+	  -- destroy:free shouldn't new their objects. Otherwise they leak all over the
+	  -- floor.
+      if method.ctor and method.parent.dub and method.parent.dub.destroy == 'free' then
+        res = format('dub_pushfulldata<%s>(L, %s, "%s");', rtype.name, value, lua.mt_name)
       else
-        push_method = 'dub_pushudata'
-      end
-      if ctype.const then
-        assert(not custom_push, string.format("Types with @dub 'push' setting should not be passed as const types (%s).", method:fullname()))
-        if self.options.read_const_member == 'copy' then
-          -- copy
-          res = res .. format('%s(L, new %s(*retval__), "%s", true);',
-                              push_method, rtype.name, lua.mt_name)
-        else
-          -- cast
-          res = res .. format('%s(L, const_cast<%s*>(retval__), "%s", false);',
-                              push_method, rtype.name, lua.mt_name)
+        -- Return value is a pointer.
+        res = format('%s%sretval__ = %s;\n',
+          (ctype.const and 'const ') or '',
+          rtype.create_name, value)
+        if not method.ctor then
+          res = res .. 'if (!retval__) return 0;\n'
         end
-      else
-        -- We should only GC in constructor.
-        if method.ctor or (method.dub and method.dub.gc) then
-          res = res .. format('%s(L, retval__, "%s", true);',
-                              push_method, lua.mt_name)
+        local push_method = rtype.dub and rtype.dub.push
+        local custom_push
+        if push_method then
+          custom_push = true
+          push_method = 'retval__->'.. push_method
         else
-          res = res .. format('%s(L, retval__, "%s", false);',
-                              push_method, lua.mt_name)
+          push_method = 'dub_pushudata'
+        end
+        if ctype.const then
+          assert(not custom_push, string.format("Types with @dub 'push' setting should not be passed as const types (%s).", method:fullname()))
+          if self.options.read_const_member == 'copy' then
+            -- copy
+            res = res .. format('%s(L, new %s(*retval__), "%s", true);',
+                                push_method, rtype.name, lua.mt_name)
+          else
+            -- cast
+            res = res .. format('%s(L, const_cast<%s*>(retval__), "%s", false);',
+                                push_method, rtype.name, lua.mt_name)
+          end
+        else
+          -- We should only GC in constructor.
+          if method.ctor or (method.dub and method.dub.gc) then
+            res = res .. format('%s(L, retval__, "%s", true);',
+                                push_method, lua.mt_name)
+          else
+            res = res .. format('%s(L, retval__, "%s", false);',
+                                push_method, lua.mt_name)
+          end
         end
       end
     end
