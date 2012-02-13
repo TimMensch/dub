@@ -813,8 +813,12 @@ function private:pushValue(method, value, return_value)
         -- Return value is a reference.
         if ctype.const then
           if self.options.read_const_member == 'copy' then
-            -- copy
-            res = format('dub_pushudata(L, new %s(%s), "%s", true);', rtype.name, value, lua.mt_name)
+            if (rtype.dub and rtype.dub.destroy=='free') then
+              res = format('dub_pushfulldata<%s>(L, %s, "%s");', rtype.name, value, lua.mt_name)
+            else
+              -- copy
+              res = format('dub_pushudata(L, new %s(%s), "%s", true);', rtype.name, value, lua.mt_name)
+            end
           else
             -- cast
             res = format('dub_pushudata(L, const_cast<%s*>(&%s), "%s", false);', rtype.name, value, lua.mt_name)
@@ -825,7 +829,7 @@ function private:pushValue(method, value, return_value)
         end
       else
         -- Return by value.
-        if method.parent.dub and method.parent.dub.destroy == 'free' then
+        if (rtype.dub and rtype.dub.destroy=='free') then
           res = format('dub_pushfulldata<%s>(L, %s, "%s");', rtype.name, value, lua.mt_name)
         else
           -- Allocate on the heap.
