@@ -29,6 +29,7 @@
 #include "dub/dub.h"
 
 #include <stdlib.h>  // malloc
+#include <stdint.h>
 
 #ifdef _MSC_VER
 #define snprintf _snprintf
@@ -38,7 +39,6 @@
 #define TYPE_EXCEPTION_MSG "expected %s, found %s"
 #define TYPE_EXCEPTION_SMSG "expected %s, found %s (using super)"
 #define DEAD_EXCEPTION_MSG  "using deleted %s"
-#define DUB_MAX_IN_SHIFT 4294967296
 #define DUB_INIT_CODE "local class = %s.%s\nlocal new = class.new\nif new then\nsetmetatable(class, {\n __call = function(_, ...)\n   return new(...)\n end,\n})\nend\n"
 #define DUB_INIT_ERR "[string \"Dub init code\"]"
 #define DUB_ERRFUNC "local self = self\nlocal print = print\nreturn function(...)\nlocal err = self.error\nif err then\nerr(self,...)\nelse\nprint(...)\nend\nend"
@@ -142,7 +142,7 @@ void Thread::pushobject(lua_State *L, void *ptr, const char *tname, bool gc) thr
   // <self> <udata> <mt>
   lua_setmetatable(L, -3); // setmetatable(self, mt)
   // <self> <udata>
-  
+
   //--=============================================== setup lua thread
   // Create env table
   lua_newtable(L);
@@ -152,7 +152,7 @@ void Thread::pushobject(lua_State *L, void *ptr, const char *tname, bool gc) thr
   if (!lua_setfenv(L, -3)) { // setfenv(udata, env)
     // <self> <udata> <env>
     lua_pop(L, 3);
-    // 
+    //
     throw Exception("Could not set userdata env on '%s'.", lua_typename(L, lua_type(L, -3)));
   }
 
@@ -160,7 +160,7 @@ void Thread::pushobject(lua_State *L, void *ptr, const char *tname, bool gc) thr
   dub_L = lua_newthread(L);
   // <self> <udata> <env> <thread>
 
-  // Store the thread in the userdata environment table so it is not 
+  // Store the thread in the userdata environment table so it is not
   // garbage collected too soon.
   luaL_ref(L, -2);
   // <self> <udata> <env>
@@ -180,14 +180,14 @@ void Thread::pushobject(lua_State *L, void *ptr, const char *tname, bool gc) thr
   if (error) {
     throw Exception("Error evaluating error function code (%s).", lua_tostring(L, -1));
   }
-  
+
   // <self> <udata> <env> <errloader>
   lua_pushvalue(L, -2);
   // <self> <udata> <env> <errloader> <env>
   if (!lua_setfenv(L, -2)) { // setfenv(errloader, env)
     // <self> <udata> <env> <errloader>
     lua_pop(L, 4);
-    // 
+    //
     throw Exception("Could not set error function env on '%s'.", lua_typename(L, lua_type(L, -3)));
   }
   // <self> <udata> <env> <errloader>
@@ -195,7 +195,7 @@ void Thread::pushobject(lua_State *L, void *ptr, const char *tname, bool gc) thr
   if (error) {
     throw Exception("Error executing error function code (%s).", lua_tostring(L, -1));
   }
-  
+
   // <self> <udata> <env> <errfunc>
 
   // <self> <udata> <env> <errfunc>
@@ -610,14 +610,13 @@ void dub_register(lua_State *L, const char *libname, const char *class_name) {
 }
 
 int dub_hash(const char *str, int sz) {
-  unsigned int h = 0;
+  uint32_t h = 0;
   int c;
 
   while ( (c = *str++) ) {
-    unsigned int h1 = (h << 6)  % DUB_MAX_IN_SHIFT;
-    unsigned int h2 = (h << 16) % DUB_MAX_IN_SHIFT;
+    uint32_t h1 = (h << 6)  ;
+    uint32_t h2 = (h << 16) ;
     h = c + h1 + h2 - h;
-    h = h % DUB_MAX_IN_SHIFT;
   }
   return h % sz;
 }
