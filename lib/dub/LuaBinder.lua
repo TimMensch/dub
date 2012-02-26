@@ -115,7 +115,14 @@ setmetatable(lib, {
 function lib:bind(inspector, options)
   self.options = options
   if options.header_base then
-    self.header_base = platform.clean_path(lk.absolutizePath(options.header_base))
+	if type(options.header_base)=='string' then
+		self.header_base = platform.clean_path(lk.absolutizePath(options.header_base))
+	else
+		self.header_base={}
+		for i,path in ipairs(options.header_base) do
+			self.header_base[i]=platform.clean_path(lk.absolutizePath(path))
+		end
+	end
   end
   self.extra_headers = {}
   private.parseExtraHeadersList(self, nil, options.extra_headers)
@@ -507,7 +514,16 @@ end
 -- Output the header for a class by removing the current path
 -- or 'header_base',
 function lib:header(header)
-  return string.gsub(header, self.header_base .. '/', '')
+	local base=self.header_base
+	if type(base)=='string' then
+		return string.gsub(header, self.header_base .. '/', '')
+	else
+		local stripped = header
+		for _,b in ipairs(base) do
+			stripped=string.gsub(stripped,b.."/",'')
+		end
+		return stripped
+	end
 end
 
 function lib:customTypeAccessor(method)
