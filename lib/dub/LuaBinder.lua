@@ -104,7 +104,7 @@ setmetatable(lib, {
       options       = options or {},
       extra_headers = {},
     }
-    self.header_base = lfs.currentdir()
+    self.header_base = platform.clean_path(lfs.currentdir())
     return setmetatable(self, lib)
   end
 })
@@ -114,7 +114,7 @@ setmetatable(lib, {
 function lib:bind(inspector, options)
   self.options = options
   if options.header_base then
-    self.header_base = lk.absolutizePath(options.header_base)
+    self.header_base = platform.clean_path(lk.absolutizePath(options.header_base))
   end
   self.extra_headers = {}
   private.parseExtraHeadersList(self, nil, options.extra_headers)
