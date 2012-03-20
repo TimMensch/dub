@@ -1387,6 +1387,19 @@ function private:makeLibFile(lib_name, list)
   if not lib then
     -- lib is the global environment.
     lib = self.ins.db
+  elseif self.options.merge_global_environment then
+    -- Merge the global environment into our namespace.
+    -- This means we merge both functions and constants;
+    -- global classes still work as expected.
+    local functions_list= lib.functions_list
+    for _,f in ipairs(self.ins.db.functions_list) do
+      functions_list[#functions_list+1]=f
+    end
+
+    local constants_list = lib.constants_list
+    for _,c in ipairs(self.ins.db.constants_list) do
+      constants_list[#constants_list+1]=c
+    end
   end
   local res = self.lib_template:run {
     lib      = lib,
