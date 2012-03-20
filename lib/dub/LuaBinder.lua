@@ -1387,6 +1387,9 @@ function private:makeLibFile(lib_name, list)
   if not lib then
     -- lib is the global environment.
     lib = self.ins.db
+	if self.options.no_global_enums then
+		lib.constants_list={}
+	end
   elseif self.options.merge_global_environment then
     -- Merge the global environment into our namespace.
     -- This means we merge both functions and constants;
