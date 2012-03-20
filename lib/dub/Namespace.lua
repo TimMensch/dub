@@ -23,12 +23,20 @@ setmetatable(lib, dub.Class)
 function lib.new(self)
   local name = self.name
   self.name = nil
+  self.const_headers = {}
   self = dub.Class(self)
   setmetatable(self, lib)
   self:setName(name)
   return self
 end
 
+function lib:namespaces()
+  return self.db:namespaces()
+end
+
+function lib:functions()
+  return self.db:functions(self)
+end
 
 --=============================================== PUBLIC METHODS
 
@@ -42,4 +50,8 @@ function lib:fullname()
   else
     return self.name
   end
+end
+
+function lib:children()
+  return self.db:children(self)
 end

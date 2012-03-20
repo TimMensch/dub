@@ -27,9 +27,9 @@ static int {{class.name}}_{{method.cname}}(lua_State *L) {
   try {
     {| self:functionBody(class, method) |}
   } catch (std::exception &e) {
-    lua_pushfstring(L, "{{self:libName(method)}}: %s", e.what());
+    lua_pushfstring(L, "{{method.name}}: %s", e.what());
   } catch (...) {
-    lua_pushfstring(L, "{{self:libName(method)}}: Unknown exception");
+    lua_pushfstring(L, "{{method.name}}: Unknown exception");
   }
   return dub_error(L);
 {% end %}
@@ -41,13 +41,7 @@ static int {{class.name}}_{{method.cname}}(lua_State *L) {
 
 // --=============================================== __tostring
 static int {{class.name}}___tostring(lua_State *L) {
-{% if class.dub.destroy == 'free' then %}
-  {{class.name}} **userdata = (({{class.name}}**)dub_checksdata_n(L, 1, "{{self:libName(class)}}"));
-  lua_pushfstring(L, "{{self:libName(class)}}: %p (full)", *userdata);
-{% else %}
-  DubUserdata *userdata = ((DubUserdata*)dub_checksdata_n(L, 1, "{{self:libName(class)}}"));
-  lua_pushfstring(L, "{{self:libName(class)}}: %p", userdata->ptr);
-{% end %}
+  {| self:toStringBody(class) |}
   return 1;
 }
 {% end %}
@@ -70,7 +64,7 @@ static const struct dub_const_Reg {{class.name}}_const[] = {
 {% for const in class:constants() do %}
   { {{string.format('%-15s, %-20s', '"'.. const ..'"', class.name..'::'..const)}} },
 {% end %}
-  { NULL, 0.0},
+  { NULL, 0},
 };
 {% end %}
 
@@ -87,7 +81,7 @@ extern "C" int luaopen_{{self:openName(class)}}(lua_State *L)
   // register member methods
   luaL_register(L, NULL, {{ class.name }}_member_methods);
   // save meta-table in {{self:libName(class.parent)}}
-  dub_register(L, "{{self:libName(class.parent)}}", "{{self:name(class)}}");
+  dub_register(L, "{{self:libName(class.parent)}}", "{{class.dub.register or self:name(class)}}");
   // <mt>
   lua_pop(L, 1);
   return 0;

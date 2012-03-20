@@ -12,8 +12,26 @@ local version = {
 }
 ----------------------------------------------------------
 
+require 'platform'
+
 local Lubyk   = {}
 Lubyk.__index = Lubyk
+
+local function getPlatform()
+	if platform.type=='windows' then
+		return 'windows'
+	end
+
+	local name = io.popen('uname'):read()
+	if not name or string.match(name, 'Darwin') then
+		return 'macosx'
+	else
+		-- FIXME: detect other platforms...
+		return 'linux'
+	end
+end
+
+Lubyk.plat = getPlatform();
 
 function lk.Lubyk(tbl)
   for k, v in pairs(tbl) do

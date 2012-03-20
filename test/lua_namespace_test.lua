@@ -14,11 +14,12 @@ require 'lubyk'
 local should = test.Suite('dub.LuaBinder - namespace')
 local binder = dub.LuaBinder()
 
+local base = lk.dir()
 local ins = dub.Inspector {
   INPUT    = {
-    'test/fixtures/namespace',
+    base .. '/fixtures/namespace',
   },
-  doc_dir  = lk.dir() .. '/tmp',
+  doc_dir  = base .. '/tmp',
 }
 
 --=============================================== bindings
@@ -49,6 +50,28 @@ function should.bindGlobalFunctionNotInNamespace()
   assertMatch('B %*a = %*%(%(B %*%*%)dub_checksdata%(L, 1, "Nem.B"%)%);', res)
   assertMatch('B %*b = %*%(%(B %*%*%)dub_checksdata%(L, 2, "Nem.B"%)%);', res)
   assertMatch('lua_pushnumber%(L, addTwoOut%(%*a, %*b%)%);', res)
+end
+
+function should.bindAll()
+  local tmp_path = base .. '/tmp'
+  lk.rmTree(tmp_path, true)
+
+  binder:bind(ins, {
+    output_directory = tmp_path,
+    single_lib = 'moo',
+    lib_prefix = false,
+  })
+  local files = {}
+  for file in lk.Dir(tmp_path):list() do
+    local base, filename = lk.directory(file)
+    lk.insertSorted(files, filename)
+  end
+  assertValueEqual({
+    'Nem_A.cpp',
+    'Nem_B.cpp',
+    'dub',
+    'moo.cpp',
+  }, files)
 end
 
 --=============================================== nested class
@@ -86,14 +109,14 @@ function should.changeNamespaceNameOnBind()
   -- found instead of moo.B.C)
   local ins = dub.Inspector {
     INPUT    = {
-      'test/fixtures/namespace',
+      base .. '/fixtures/namespace',
       -- This is just to have the Vect class for gc testing.
-      'test/fixtures/pointers',
+      base .. '/fixtures/pointers',
     },
-    doc_dir  = lk.dir() .. '/tmp',
+    doc_dir  = base .. '/tmp',
   }
 
-  local tmp_path = 'test/tmp'
+  local tmp_path = base .. '/tmp'
   lk.rmTree(tmp_path, true)
 
   os.execute('mkdir -p '..tmp_path)
@@ -112,6 +135,10 @@ function should.changeNamespaceNameOnBind()
     -- This creates a MyLib_open.cpp file
     -- that has to be included in build.
     single_lib = 'moo',
+    -- This is used to bind the namespace constants and
+    -- functions.
+    namespace  = 'Nem',
+    -- What is this ??
     lib_prefix = false,
     only = {
       'Nem::A',
@@ -120,7 +147,7 @@ function should.changeNamespaceNameOnBind()
       'Nem::Rect',
       'Vect',
     },
-    custom_bindings = 'test/fixtures/namespace',
+    custom_bindings = base .. '/fixtures/namespace',
   })
   binder.name = nil
   local res = lk.readall(tmp_path .. '/moo_A.cpp')
@@ -137,20 +164,20 @@ function should.changeNamespaceNameOnBind()
 
   assertPass(function()
     binder:build {
-      output   = 'test/tmp/moo.so',
+      output   = base .. '/tmp/moo.so',
       inputs   = {
-        'test/tmp/dub/dub.cpp',
-        'test/tmp/moo_A.cpp',
-        'test/tmp/moo_B.cpp',
-        'test/tmp/moo_B_C.cpp',
-        'test/tmp/moo.cpp',
-        'test/tmp/Vect.cpp',
-        'test/tmp/moo_Rect.cpp',
-        'test/fixtures/pointers/vect.cpp',
+        base .. '/tmp/dub/dub.cpp',
+        base .. '/tmp/moo_A.cpp',
+        base .. '/tmp/moo_B.cpp',
+        base .. '/tmp/moo_B_C.cpp',
+        base .. '/tmp/moo.cpp',
+        base .. '/tmp/Vect.cpp',
+        base .. '/tmp/moo_Rect.cpp',
+        base .. '/fixtures/pointers/vect.cpp',
       },
       includes = {
-        'test/tmp',
-        'test/fixtures/namespace',
+        base .. '/tmp',
+        base .. '/fixtures/namespace',
       },
     }
 
@@ -258,11 +285,17 @@ function should.buildTemplate()
   assertEqual(3, r.h)
 end
 
-function should.callGlobalFunction()
+function should.callNamespaceFunction()
   local a = moo.B(1)
   local b = moo.B(2)
   assertEqual(3, moo.addTwo(a,b))
-  assertEqual(3, moo.addTwoOut(a,b))
+  assertNil(moo.addTwoOut)
+end
+
+function should.readNamespaceConstant()
+  assertEqual(1, moo.One)
+  assertEqual(2, moo.Two)
+  assertEqual(55, moo.Three)
 end
 
 test.all()

@@ -13,9 +13,10 @@ require 'lubyk'
 local should = test.Suite('dub.LuaBinder - memory')
 local binder = dub.LuaBinder()
 
+local base = lk.dir()
 local ins_opts = {
-  INPUT    = 'test/fixtures/memory',
-  doc_dir  = lk.dir() .. '/tmp',
+  INPUT    = base .. '/fixtures/memory',
+  doc_dir  = base .. '/tmp',
   PREDEFINED = {
     'SOME_FUNCTION_MACRO(x)=',
     'OTHER_FUNCTION_MACRO(x)=',
@@ -78,21 +79,24 @@ function should.bindCompileAndLoad()
   assertPass(function()
     -- Build mem.so
     binder:build {
-      output   = 'test/tmp/mem.so',
+      output   = base .. '/tmp/mem.so',
       inputs   = {
-        'test/tmp/dub/dub.cpp',
-        'test/tmp/mem_Nogc.cpp',
-        'test/tmp/mem_Withgc.cpp',
-        'test/tmp/mem_Union.cpp',
-        'test/tmp/mem_Pen.cpp',
-        'test/tmp/mem_Owner.cpp',
-        'test/tmp/mem_PrivateDtor.cpp',
-        'test/fixtures/memory/owner.cpp',
-        'test/tmp/mem.cpp',
+        base .. '/tmp/dub/dub.cpp',
+        base .. '/tmp/mem_Nogc.cpp',
+        base .. '/tmp/mem_Withgc.cpp',
+        base .. '/tmp/mem_Union.cpp',
+        base .. '/tmp/mem_Pen.cpp',
+        base .. '/tmp/mem_Owner.cpp',
+        base .. '/tmp/mem_PrivateDtor.cpp',
+        base .. '/tmp/mem_CustomDtor.cpp',
+        base .. '/tmp/mem_NoDtor.cpp',
+        base .. '/tmp/mem_NoDtorCleaner.cpp',
+        base .. '/fixtures/memory/owner.cpp',
+        base .. '/tmp/mem.cpp',
       },
       includes = {
-        'test/tmp',
-        'test/fixtures/memory',
+        base .. '/tmp',
+        base .. '/fixtures/memory',
       },
     }
     package.cpath = tmp_path .. '/?.so'
@@ -113,14 +117,14 @@ end
 
 local function createAndDestroyMany(ctor)
   local t = {}
-  local start = worker:now()
+  local start = now()
   for i = 1,100000 do
     table.insert(t, ctor(1,3))
   end
   t = nil
   collectgarbage()
   collectgarbage()
-  return worker:now() - start
+  return now() - start
 end
 
 local function runGcTest(ctor, fmt)
@@ -167,7 +171,7 @@ function should.destroyFromCpp()
   -- Destructor called in C++
   assertEqual("Pen 'Arty' is dying...", o.message)
   -- Object is dead in Lua
-  assertError('lua_memory_test.lua:[0-9]+: mem.Pen.name: using deleted mem.Pen', function()
+  assertError('lua_memory_test.lua:[0-9]+: name: using deleted mem.Pen', function()
     p:name()
   end)
 end
@@ -184,6 +188,44 @@ function should.considerAnonUnionAsMembers()
   u.a = 11
   local c = 10 + (15 * 2^8) + (4 * 2^16) + (11 * 2^24)
   assertEqual(c,  u.c)
+end
+
+--=============================================== Custom dtor
+
+function should.useCustomDtor()
+  local d = mem.CustomDtor()
+  local t
+  function d:callback()
+    t = true
+  end
+  assertNil(t)
+  d = nil
+  collectgarbage('collect')
+  collectgarbage('collect')
+  assertTrue(t)
+end
+
+--=============================================== No dtor
+
+function should.notUseDtor()
+  local d = mem.NoDtor('Hulk')
+  local cleaner = mem.NoDtorCleaner(d)
+  local t
+  -- When d is deleted, it calls cleaner->deleted which
+  -- calls this callback.
+  function cleaner:callback(s)
+    t = s
+  end
+  assertNil(t)
+  d = nil
+  collectgarbage('collect')
+  collectgarbage('collect')
+  -- Callback not called: d is not deleted
+  assertNil(t)
+  -- Explicitely delete attached NoDtor.
+  cleaner:cleanup()
+  -- Callback called: d is deleted
+  assertEqual('Hulk', t)
 end
 
 test.all()

@@ -5,6 +5,10 @@
   * Anonymous union support.
   * Added support for Callbacks from C++.
   * Added support for pseudo-attributes (get/set methods).
+  * Added support for string_format and string_args to customize __tostring from @dub.
+  * Added support for 'register' option in @dub.
+  * Added support for custom destructor: 'destructor' option in @dub.
+  * Added 'namespace' option (support for namespace constants and functions.
 
 * Minor enhancement
   * Should not add namespace to typedef of template in namespace.
@@ -19,6 +23,11 @@
   * Fixed bug where lua stack would grow during class registration (Tim Mensch).
   * Added 'attr_name_filter' to rename attributes.
   * Removed 'yaml' dependency and changed @dub options format.
+  * Binding all classes now works inside a namespace.
+  * Added support for custom bindings with default values.
+  * Added @dub bind: false option to not create bindings.
+  * Added @dub destructor: false option to not destroy from lua.
+  * @dub ignore can be used to ignore attributes.
 
 == 2.0.0 2012-01-21
 * Complete rewrite in Lua

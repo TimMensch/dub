@@ -89,7 +89,7 @@ local lib     = {
 	QUOTE = '',
   COMPILER_FLAGS = {
     macosx = '-g -Wall -Wl,-headerpad_max_install_names -flat_namespace -undefined suppress -dynamic -bundle -fPIC',
-    linux  = '-g -Wall -Wl,-headerpad_max_install_names -flat_namespace -undefined suppress -dynamic -fPIC',
+    linux  = '-g -Wall -Wl,-headerpad_max_install_names -shared -fPIC',
     windows = '-g -Wall -Wl,-headerpad_max_install_names,--allow-shlib-undefined -shared  ',
   }
 }
@@ -127,13 +127,22 @@ function lib:bind(inspector, options)
   self.extra_headers = {}
   private.parseExtraHeadersList(self, nil, options.extra_headers)
 
-
+  local namespace_name = options.namespace or options.single_lib
+  if namespace_name then
+    self.namespace = inspector:find(namespace_name)
+  end
   if options.single_lib then
-    -- default is to prefix mt types with lib name
-    if options.lib_prefix == false then
-      options.lib_prefix = nil
+    -- default is to:
+    --   * prefix mt types with lib name if we do not have a namespace
+    --   * not prefix if we have a namespace
+    if self.namespace then
+      -- in a namespace. Leave lib_prefix to nil or false.
     else
-      options.lib_prefix = options.lib_prefix or options.single_lib
+      if options.lib_prefix == false then
+        options.lib_prefix = nil
+      else
+        options.lib_prefix = options.lib_prefix or options.single_lib
+      end
     end
   end
 
@@ -169,14 +178,7 @@ function lib:bind(inspector, options)
       end
     end
 
-    for elem in inspector:children() do
-      if elem.type == 'dub.Class' then
-        if not ignore[elem.name] then
-          table.insert(bound, elem)
-          private.bindElem(self, elem, options)
-        end
-      end
-    end
+    private.bindAll(self, inspector, bound, ignore)
   end
 
   if options.single_lib then
@@ -200,7 +202,7 @@ function lib:build(opts)
   end
   local cmd = 'cd ' .. work_dir .. ' && '
   cmd = cmd .. self.COMPILER .. ' '
-  cmd = cmd .. self.COMPILER_FLAGS[private.platform()] .. ' '
+  cmd = cmd .. self.COMPILER_FLAGS[Lubyk.plat] .. ' '
   cmd = cmd .. flags .. ' '
   cmd = cmd .. '-o ' .. opts.output .. ' '
   cmd = cmd .. files .. self.QUOTE
@@ -223,6 +225,15 @@ function lib:bindClass(class)
     self.class_template = dub.Template {path = dir .. '/lua/class.cpp'}
   end
   return self.class_template:run {class = class, self = self}
+end
+
+function lib:addCustomTypes(list)
+  for k, v in pairs(list) do
+    if type(v) == 'table' and not v.type then
+      v.type = k
+    end
+    self.TYPE_TO_CHECK[k] = v
+  end
 end
 
 function private:callWithParams(class, method, param_delta, indent, custom, max_arg)
@@ -288,7 +299,12 @@ function lib:functionBody(parent, method)
       if custom and custom.cleanup then
         res = res .. '  ' .. string.gsub(custom.cleanup, '\n', '\n  ')
       end
-      res = res .. '  delete self;\n'
+      local dtor = parent.dub.destructor or method.parent.dub.destructor
+      if dtor then
+        res = res .. format('  self->%s();\n', dtor)
+      else
+        res = res .. '  delete self;\n'
+      end
       res = res .. '}\n'
       res = res .. 'userdata->gc = false;\n'
       res = res .. 'return 0;'
@@ -315,7 +331,7 @@ function lib:functionBody(parent, method)
         res = res .. 'int top__ = lua_gettop(L);\n'
       end
       res = res .. private.expandTree(self, tree, parent, param_delta, '')
-    elseif not custom and method.has_defaults then
+    elseif method.has_defaults and ( (not custom) or (not custom.body) ) then
       res = res .. 'int top__ = lua_gettop(L);\n'
       local last, first = #method.params_list, method.first_default - 1
       for i=last, first, -1 do
@@ -327,7 +343,7 @@ function lib:functionBody(parent, method)
         else
           res = res .. format('if (top__ >= %i) {\n', param_delta + i)
         end
-        res = res .. '  ' .. private.callWithParams(self, parent, method, param_delta, '  ', nil, i) .. '\n'
+        res = res .. '  ' .. private.callWithParams(self, parent, method, param_delta, '  ', custom and custom['arg'..i], i) .. '\n'
       end
       res = res .. '}'
     else
@@ -481,6 +497,7 @@ function lib:headers(elem)
     headers = self.extra_headers['::'] or {}
   end
   local co = coroutine.create(function()
+    -- Extra headers
     for _, h in ipairs(headers) do
       if not seen[h] then
         coroutine.yield(h)
@@ -488,6 +505,7 @@ function lib:headers(elem)
       end
     end
     if elem then
+      -- Class header
       coroutine.yield(elem.header)
     else
       -- No element, binding library
@@ -625,6 +643,37 @@ function lib:luaType(parent, ctype)
       mt_name = mt_name,
     }
   end
+end
+
+local dummy_to_string_method = {
+  neverThrows = function()
+    return true
+  end,
+}
+function lib:toStringBody(class)
+  local res = ''
+  -- We need self
+  res = res .. private.getSelf(self, class, dummy_to_string_method, false)
+  if class.dub.string_format then
+    local args = class.dub.string_args
+    if type(args) == 'table' then
+      args = lk.join(args, ', ')
+    end
+    res = res .. format("lua_pushfstring(L, \"%s: %%p (%s)\", %s, %s);\n",
+                        self:libName(class),
+                        class.dub.string_format,
+                        self.SELF,
+                        args)
+  else
+    local fmt
+    if class.dub.destroy == 'free' then
+      fmt = "lua_pushfstring(L, \"%s: %%p (full)\", %s);\n"
+    else
+      fmt = "lua_pushfstring(L, \"%s: %%p\", %s);\n"
+    end
+    res = res .. format(fmt, self:libName(class), self.SELF)
+  end
+  return res
 end
 
 --=============================================== PRIVATE
@@ -919,7 +968,11 @@ function private:pushValue(method, value, return_value)
     -- native type
     res = format('lua_push%s(L, %s);', lua.type, value)
   end
-  return res .. '\nreturn 1;'
+  if string.match(res, '^return ') then
+    return res
+  else
+    return res .. '\nreturn 1;'
+  end
 end
 
 function private:copyDubFiles()
@@ -934,22 +987,6 @@ function private:copyDubFiles()
       local res = lk.readall(dub_dir .. '/' .. file)
       lk.writeall(base_path .. '/dub/' .. file, res, true)
     end
-  end
-end
-
--- Detect platform
-function private.platform()
-
-	if platform.type=='windows' then
-		return 'windows'
-	end
-
-  local name = io.popen('uname'):read()
-  if not name or string.match(name, 'Darwin') then
-    return 'macosx'
-  else
-    -- FIXME: detect other platforms...
-    return 'linux'
   end
 end
 
@@ -1155,6 +1192,21 @@ function private:switch(class, method, delta, bfunc, iterator)
   return res
 end
 
+function private:bindAll(parent, bound, ignore)
+  for elem in parent:children() do
+    if elem.type == 'dub.Class' then
+      if not ignore[elem.name] and not (elem.dub.bind == false) then
+        table.insert(bound, elem)
+        private.bindElem(self, elem, options)
+      end
+    elseif elem.type == 'dub.Namespace' then
+      if not ignore[elem.name] then
+        private.bindAll(self, elem, bound, ignore)
+      end
+    end
+  end
+end
+
 function private:bindElem(elem, options)
   if elem.type == 'dub.Class' then
     local path = self.output_directory .. lk.Dir.sep .. self:openName(elem) .. '.cpp'
@@ -1162,6 +1214,7 @@ function private:bindElem(elem, options)
   end
 end
 
+local strip = lk.strip
 function private:parseCustomBindings(custom)
   if type(custom) == 'string' then
     -- This is a directory. Build table.
@@ -1173,14 +1226,14 @@ function private:parseCustomBindings(custom)
       local lua = yaml.loadpath(yaml_file).lua
       for _, group in pairs(lua) do
         -- attributes, methods
-        for name, body in pairs(group) do
+        for name, value in pairs(group) do
           -- each attribute or method
-          if type(body) == 'string' then
+          if type(value) == 'string' then
             -- strip last newline
-            group[name] = {body = string.sub(body, 1, -2)}
+            group[name] = {body = strip(value)}
           else
-            for k, v in pairs(body) do
-              body[k] = string.sub(v, 1, -2)
+            for k, v in pairs(value) do
+              value[k] = strip(v)
             end
           end
         end
@@ -1329,14 +1382,21 @@ function private:makeLibFile(lib_name, list)
     self.lib_template = dub.Template {path = dir .. '/lua/lib.cpp'}
   end
   self.bound_classes = list
+  -- lib is a namespace
+  local lib = self.namespace
+  if not lib then
+    -- lib is the global environment.
+    lib = self.ins.db
+  end
   local res = self.lib_template:run {
-    lib      = self.ins.db,
+    lib      = lib,
     lib_name = lib_name,
     classes  = list,
     self     = self,
   }
 
-  local path = self.output_directory .. lk.Dir.sep .. lib_name .. '.cpp'
+  local openname = self.options.luaopen or lib_name
+  local path = self.output_directory .. lk.Dir.sep .. openname .. '.cpp'
   lk.writeall(path, res, true)
 end
 

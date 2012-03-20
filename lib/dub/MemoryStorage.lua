@@ -10,7 +10,8 @@
 local lib     = {
   type = 'dub.MemoryStorage',
 }
-local DOXYGEN_VERSION = "1.7.5"
+-- Pattern to check for Doxygen version
+local DOXYGEN_VERSION = "1%.7%."
 local private = {}
 local parse   = {}
 lib.__index   = lib
@@ -53,7 +54,7 @@ function lib:parse(xml_dir, not_lazy, ignore_list)
     table.insert(xml_headers, {path = file, dir = xml_dir})
   end
   -- Parse namespace content
-  for file in dir:glob('namespace_.*.xml') do
+  for file in dir:glob('namespace.*.xml') do
     table.insert(xml_headers, {path = file, dir = xml_dir})
   end
   if not_lazy then
@@ -112,6 +113,8 @@ function lib:functions(parent)
           seen[elem.name] = true
           return elem
         end
+      elseif not ok then
+        print(elem, debug.traceback(co))
       else
         return nil
       end
@@ -128,6 +131,8 @@ function lib:variables(parent)
     local ok, elem = coroutine.resume(co, parent, 'variables_list')
     if ok then
       return elem
+    else
+      print(elem, debug.traceback(co))
     end
   end
 end
@@ -143,6 +148,7 @@ function lib:headers(classes)
       local h = class.header
       if not seen[h] then
         coroutine.yield(h)
+        seen[h] = true
       end
     end
     -- For every global function
@@ -150,12 +156,23 @@ function lib:headers(classes)
       local h = func.header
       if not seen[h] then
         coroutine.yield(h)
+        seen[h] = true
       end
     end
     -- For every constant
     for i, h in ipairs(self.const_headers) do
       if not seen[h] then
         coroutine.yield(h)
+        seen[h] = true
+      end
+    end
+    -- For every namespace
+    for _, n in ipairs(self.namespaces_list) do
+      for i, h in ipairs(n.const_headers) do
+        if not seen[h] then
+          coroutine.yield(h)
+          seen[h] = true
+        end
       end
     end
   end)
@@ -163,19 +180,24 @@ function lib:headers(classes)
     local ok, elem = coroutine.resume(co)
     if ok then
       return elem
+    else
+      print(elem, debug.traceback(co))
     end
   end
 end
 
 --- Return an iterator over the variables of this class/namespace.
-function lib:children()
+function lib:children(parent)
+  parent = parent or self
   -- make sure we have parsed the headers
-  private.parseHeaders(self)
+  private.parseHeaders(parent)
   local co = coroutine.create(private.iterator)
   return function()
-    local ok, elem = coroutine.resume(co, self.sorted_cache)
+    local ok, elem = coroutine.resume(co, parent.sorted_cache)
     if ok then
       return elem
+    else
+      print(elem, debug.traceback(co))
     end
   end
 end
@@ -185,11 +207,13 @@ function lib:superclasses(parent)
   -- make sure we have parsed the headers
   private.parseHeaders(self)
   private.parseHeaders(parent)
-  local co = co or coroutine.create(private.superIterator)
+  local co = coroutine.create(private.superIterator)
   return function()
     local ok, elem = coroutine.resume(co, self, parent)
     if ok then
       return elem
+    else
+      print(elem, debug.traceback(co))
     end
   end
 end
@@ -203,11 +227,13 @@ function lib:constants(parent)
   else
     parent = self
   end
-  local co = co or coroutine.create(private.iterator)
+  local co = coroutine.create(private.iterator)
   return function()
     local ok, elem = coroutine.resume(co, parent.constants_list)
     if ok then
       return elem
+    else
+      print(elem, debug.traceback(co))
     end
   end
 end
@@ -221,6 +247,8 @@ function lib:namespaces()
     local ok, elem = coroutine.resume(co, self.namespaces_list)
     if ok then
       return elem
+    else
+      print(elem, debug.traceback(co))
     end
   end
 end
@@ -313,27 +341,34 @@ function private.iteratorWithSuper(elem, key)
 end
 
 -- Iterate superclass hierarchy.
-function private:superIterator(base)
+function private:superIterator(base, seen)
+  -- Only iterate over a parent once
+  local seen = seen or {}
   for _, name in ipairs(base.super_list) do
+    local class
     local super = self:resolveType(base.parent or self, name)
     if not super then
       -- Yield an empty class that can be used for casting
-      coroutine.yield(dub.Class {
+      class = dub.Class {
         name = name,
         parent = base.parent,
         create_name = name .. ' *',
         db = self,
-      })
+      }
     else
-      if super then
-        private.superIterator(self, super)
-        coroutine.yield(super)
-      end
+      class = super
+    end
+    local fullname = class:fullname()
+    if not seen[fullname] then
+      seen[fullname] = true
+      private.superIterator(self, class, seen)
+      coroutine.yield(class)
     end
   end
+
   -- Find pseudo parents
   if base.dub.super then
-    private.superIterator(self, {super_list = base.dub.super, dub = {}})
+    private.superIterator(self, {super_list = base.dub.super, dub = {}}, seen)
   end
 end
 
@@ -526,7 +561,7 @@ function parse:sectiondef(elem, header)
      then
     parse.children(self, elem, header)
     if kind == 'enum' then
-      -- global enum
+      -- global or namespace enum
       table.insert(self.const_headers, header.file)
     end
   elseif kind == 'private-func' or kind == 'protected-func' then
@@ -565,7 +600,8 @@ end
 function parse:variable(elem, header)
   local name = elem:find('name')[1]
   local definition = elem:find('definition')[1]
-  if string.match(definition, '@') then
+  if string.match(definition, '@') or
+     self.ignore[name] then
     -- ignore
     return nil
   end
@@ -633,7 +669,7 @@ function parse:typedef(elem, header)
     xml         = elem,
     definition  = elem:find('definition')[1],
     location    = private.makeLocation(elem, header),
-    header_path = header.file,
+    header_path = elem:find('location').file,
   }
   typ.ctype.create_name = typ.name .. ' '
   return typ
@@ -878,7 +914,9 @@ end
 
 -- self == class
 function private:makeDestructor()
-  if self.cache['~' .. self.name] or self.dub.destroy == 'free' then
+  if self.cache['~' .. self.name]  or
+     self.ignore['~' .. self.name] or
+     self.dub.destroy == 'free' then
     -- Destructor not needed.
     return
   end
@@ -1097,9 +1135,11 @@ function private.flatten(xml)
 end
 
 function parse.detaileddescription(self, elem, header)
-  local opt = parse.opt(elem)
+  local opt= parse.opt(elem)
   if opt then
     self:setOpt(opt)
+  elseif opt == nil then
+    print(string.format("Could not parse @dub settings: %s", xml.dump(elem)))
   end
 end
 
@@ -1112,11 +1152,11 @@ function parse.opt(elem)
     if (sect:find('title') or {})[1] == 'Bindings info:' then
       local txt = private.flatten(sect:find('para'))
       -- HACK TO RECREATE NEWLINES...
-      txt = string.gsub(txt, ' ([a-z]+):', '\n%1:')
+      txt = string.gsub(txt, ' ([A-Z_a-z]+):', '\n%1:')
       return parseOpt(txt)
     end
   end
-  return nil
+  return false
 end
 
 -- function lib:find(scope, name)
@@ -1150,7 +1190,7 @@ function private.checkDoxygenVersion(data)
   local str = (data:find('doxygen') or {version='???'}).version
   if not checked_versions[str] then
     checked_versions[str] = true
-    local pattern = '^'..string.gsub(DOXYGEN_VERSION, '%.', '%.')
+    local pattern = '^'..DOXYGEN_VERSION
     if not string.match(str, pattern) then
       print(string.format("WARNING: XML generated by Doxygen '%s'. This version of Dub was tested with version '%s'.", str, DOXYGEN_VERSION))
     end
@@ -1178,6 +1218,8 @@ function private:allGlobalFunctions()
     local ok, elem = coroutine.resume(co, scopes, 'functions_list')
     if ok then
       return elem
+    else
+      print(elem, debug.traceback(co))
     end
   end
 end

@@ -139,6 +139,22 @@ function lib:setOpt(opt)
   self.dub      = opt or {}
   self.dub_type = self.dub.type
   self.ignore   = self.dub.ignore or {}
+  if type(self.ignore) == 'string' then
+    self.ignore = { self.ignore,
+      [self.ignore] = true,
+    }
+  end
+
+  if type(self.dub.super) == 'string' then
+    self.dub.super = { self.dub.super }
+  end
+
+  local dtor = self.dub.destructor
+  if dtor == false then
+    self.ignore['~'..self.name] = true
+  elseif dtor then
+    self.ignore[dtor] = true
+  end
 end
 
 -- Return the enclosing namespace or nil if none found.

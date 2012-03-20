@@ -29,7 +29,7 @@
 #ifndef DUB_BINDING_GENERATOR_DUB_H_
 #define DUB_BINDING_GENERATOR_DUB_H_
 
-#include <string.h>  // strcmp etc.
+#include <string.h>  // strlen strcmp
 
 #ifdef _MSC_VER
 #pragma warning(disable:4244)
@@ -61,9 +61,9 @@ extern "C" {
 #include <string>    // std::string for Exception
 #include <exception> // std::exception
 
-// Rename macro
-#define DubObject dub::Object
-#define DubThread dub::Thread
+// Helpers to check for explicit 'false' or 'true' return values.
+#define lua_isfalse(L,i) (lua_isboolean(L,i) && !lua_toboolean(L,i))
+#define lua_istrue(L,i)  (lua_isboolean(L,i) && lua_toboolean(L,i))
 
 struct DubUserdata {
   void *ptr;
@@ -135,28 +135,35 @@ public:
    * called instead of dub_pushudata.
    * <udata> <mt>
    */
-  virtual void pushobject(lua_State *L, void *ptr, const char *type_name, bool gc = true) throw(dub::Exception);
+  virtual void pushobject(lua_State *L, void *ptr, const char *type_name, bool gc = true);
 
   /** Push function 'name' found in <self> on the stack with <self> as
    * first argument.
+   *
+   * Constness is there to make it easy to implement callbacks like
+   * int rowCount() const, without requiring users to fiddle with constness
+   * which is not a notion part of Lua anyway.
    */
-  bool dub_pushcallback(const char *name);
+  bool dub_pushcallback(const char *name) const;
 
   /** Push any lua value from self on the stack.
    */
-  void dub_pushvalue(const char *name);
-
+  void dub_pushvalue(const char *name) const;
+  
   /** Execute the protected call. If an error occurs, dub tries to find
    * an 'error' function in <self> and calls this function with the
    * error string. If no error function is found, the error message is
    * just printed out to stderr.
    */
-  bool dub_call(int param_count, int retval_count);
+  bool dub_call(int param_count, int retval_count) const;
 
-protected:
-  /** Lua thread that contains <self> on stack position 1.
+  /** Lua thread that contains <self> on stack position 1. This lua thread
+   * is public to ease object state manipulation from C++ (but stack *must
+   * not* be messed up).
    */
   lua_State *dub_L;
+
+protected:
   /** Type name (allows faster check for cast).
    */
   const char *dub_typename_;
@@ -181,7 +188,7 @@ struct DubRef {
         ref = (DubRef*)*ptr;
         luaL_unref(L, LUA_REGISTRYINDEX, ref->ref);
       } else {
-        ref = new DubRef;
+        ref = new DubRef();
         *ptr = ref;
       }
       ref->ref = luaL_ref(L, LUA_REGISTRYINDEX);

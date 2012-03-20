@@ -59,6 +59,11 @@ function lib:parse(opts)
 
   platform.mkdir(doc_dir)
 
+  if opts.html then
+    opts.GENERATE_HTML = 'YES'
+  end
+
+
   local doxypath = opts.Doxyfile
   if not doxypath then
     doxypath = doc_dir .. '/Doxyfile'
