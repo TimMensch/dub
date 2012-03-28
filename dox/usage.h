@@ -1,7 +1,7 @@
 /**
  * @page dub_usage Dub Usage
  *
- * @subsection custom_bindings Custom Class, Function, and Attribute Bindings
+ * @section custom_bindings Custom Class, Function, and Attribute Bindings
  *
  * @warning Whether a binding has a semicolon changes its behavior, at least in
  *  		accessor bindings. Should talk about this more, and see where the
@@ -19,11 +19,54 @@
  *
  * @subsection dub_class_overrides Class Overrides
  *
+ * @subsubsection dub_register Change the name of a class
+ *
+ * @paragraph dub_register_1
+ *
+ * \@dub register: AlternateName
+ *
+ * Registers the class using the given AlternateName instead of its actual name.
+ * Doesn't change the name of the associated metatable, though.
+ *
+ * @subsubsection dub_ignore Ignore a member function
+ *
+ * @paragraph dub_ignore_1
+ *
+ * \@dub ignore: memberName[, memberName2 ...]
+ *
+ * Tell Dub to ignore a member; in other words, don't generate any binding
+ * information for any functions or member variables with matching names.
+ *
+ * @subsubsection dub_super Add parent class information
+ *
+ * @paragraph dub_super_1
+ *
+ * \@dub super: ParentClass[, ParentClass2]
+ *
+ * Set parent classes in Dub that Doxygen doesn't know about. Can also be used
+ * to add mixins to a class.
+ *
+ * @subsubsection dub_bind Set binding for a class.
+ *
+ * @paragraph dub_bind_1
+ *
+ * \@dub bind: false
+ *
+ * Setting to false disables binding.
+ *
+ * @subsubsection dub_cast Set casting for a class.
+ *
+ * @paragraph dub_cast_1
+ *
+ * \@dub cast: false
+ *
+ * Setting to false disables casting.
+ *
  * @subsubsection dub_push Mark a function as a "push" function
  *
  * @paragraph dub_push_1
  *
- * \@dub push: "functionName" -- typically "push"
+ * \@dub push: functionName -- typically "push"
  *
  * Set the name of the function to push this class onto the Lua stack. The
  * signature of the function should match:
@@ -43,6 +86,15 @@
  * The boolean shouldGC will be true if Dub believes Lua should garbage-collect
  * the value. In practice this means that the call is being made in the
  * constructor of the class, or a method
+ *
+ * @subsubsection dub_destructor Set the destructor function for a class.
+ *
+ * @paragraph dub_destructor_1
+ *
+ * \@dub destructor: functionName
+ *
+ * The name of the member function to call to destroy the class. Should call
+ * "delete this" if that's needed to destroy the underlying object.
  *
  * @subsubsection dub_destroy_free POD Class Optimization/Destructor Disabling
  *
