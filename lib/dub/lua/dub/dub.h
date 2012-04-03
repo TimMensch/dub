@@ -91,6 +91,7 @@ class TypeException : public Exception {
 public:
   explicit TypeException(lua_State *L, int narg, const char *type, bool is_super = false);
 };
+#if DUB_CLASSES
 
 /** This class allows an object to be deleted from either C++ or Lua.
  * When Lua deletes the object, dub_destroy is called. When C++ deletes
@@ -168,6 +169,7 @@ protected:
    */
   const char *dub_typename_;
 };
+#endif //DUB_CLASSES
 
 } // dub
 
@@ -215,7 +217,6 @@ struct DubRef {
     }
   }
 };
-
 /**
  * Push a custom type on the stack.
  *
@@ -350,5 +351,9 @@ void dub_register(lua_State *L, const char *libname, const char *class_name);
 // This version is slightly adapted to cope with different
 // hash sizes (and to be easy to write in Lua).
 int dub_hash(const char *str, int sz);
+
+#if DUB_CLASSES
+#undef throw
+#endif
 
 #endif // DUB_BINDING_GENERATOR_DUB_H_
