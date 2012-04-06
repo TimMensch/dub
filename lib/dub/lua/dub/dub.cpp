@@ -47,8 +47,6 @@
 
 using namespace dub;
 
-#if DUB_CLASSES
-
 // ======================================================================
 // =============================================== dub::Exception
 // ======================================================================
@@ -70,6 +68,8 @@ const char* Exception::what() const throw() {
 
 TypeException::TypeException(lua_State *L, int narg, const char *type, bool is_super) :
   Exception(is_super ? TYPE_EXCEPTION_SMSG : TYPE_EXCEPTION_MSG, type, luaL_typename(L, narg)) {}
+
+#if DUB_CLASSES
 
 // ======================================================================
 // =============================================== dub::Object
