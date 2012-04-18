@@ -506,11 +506,21 @@ end
 function lib:header(header)
 	local base=self.header_base
 	if type(base)=='string' then
-		return string.gsub(header, self.header_base .. '/', '')
+		-- on Windows, case can be messed up
+		local s,e = string.find( header:lower(), self.header_base:lower()..'/' )
+		if e then
+			header=header:sub(e+1)
+		end
+
+		return header
 	else
 		local stripped = header
 		for _,b in ipairs(base) do
-			stripped=string.gsub(stripped,b.."/",'')
+			-- on Windows, case can be messed up
+			local s,e = string.find( stripped:lower(), b:lower()..'/' )
+			if e then
+				stripped=stripped:sub(e+1)
+			end
 		end
 		return stripped
 	end
